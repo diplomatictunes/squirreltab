@@ -4,8 +4,7 @@ const { merge } = require('webpack-merge')
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const { CleanWebpackPlugin } = require('clean-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
-const { VueLoaderPlugin } = require('vue-loader')
-const VuetifyLoaderPlugin = require('vuetify-loader/lib/plugin')
+const sveltePreprocess = require('svelte-preprocess')
 const path = require('path')
 
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -18,7 +17,7 @@ const clientConfig = {
     __DEV_CSP_SCRIPT__: '',
     __DEV_CSP_CONNECT__: '',
     __EXT_NAME__: 'IceTab (dev)',
-    __CONTENT_SCRIPTS_MATCHES__: process.env.MOZ ? '*://*/*' : 'http://127.0.0.1:3000/*',
+    __CONTENT_SCRIPTS_MATCHES__: process.env.MOZ ? '*://*/*' : 'http://127.0.0.1:8000/*',
   },
   production: {
     __CLIENT_ID__: '530831729511-dclgvblhv7var13mvpjochb5f295a6vc.apps.googleusercontent.com',
@@ -94,9 +93,6 @@ module.exports = {
         removeAttributeQuotes: true
       } : false,
     }),
-
-    new VueLoaderPlugin(),
-    new VuetifyLoaderPlugin(),
   ],
   performance: {
     hints: false,
@@ -115,72 +111,61 @@ module.exports = {
     },
   },
   resolve: {
-    extensions: ['.js', '.vue', '.json'],
     alias: {
-      'vue$': 'vue/dist/vue.runtime.esm.js',
-      '@': resolve('src'),
-    }
+      '@': path.resolve(__dirname, 'src'),
+    },
+    extensions: ['.mjs', '.js', '.svelte', '.json'],
+    conditionNames: ['svelte', 'browser', 'import', 'default'],
+    mainFields: ['svelte', 'browser', 'module', 'main'],
+    fullySpecified: false
   },
   module: {
     rules: [
       {
-        test: /\.vue$/,
-        loader: 'vue-loader',
+        test: /\.svelte$/,
+        use: {
+          loader: 'svelte-loader',
+          options: {
+            compilerOptions: {
+              dev: isDevelopment
+            },
+            emitCss: true,
+            hotReload: false
+          }
+        }
       },
       {
-        test: /\.js$/,
-        loader: 'babel-loader',
-        include: [resolve('src')],
+        test: /\.svelte\.js$/,
+        use: {
+          loader: 'svelte-loader',
+          options: {
+            compilerOptions: {
+              dev: isDevelopment
+            },
+            emitCss: false,
+            hotReload: false
+          }
+        }
       },
       {
         test: /\.css$/,
-        use: [
-          'vue-style-loader',
-          'css-loader'
-        ]
+        use: ['style-loader', 'css-loader']
       },
       {
-        test: /\.scss$/,
-        use: [
-          'vue-style-loader',
-          'css-loader',
-          'sass-loader'
-        ]
-      },
-      {
-        test: /\.styl/,
-        use: [
-          'vue-style-loader',
-          'css-loader',
-          'stylus-loader'
-        ]
-      },
-      {
-        test: /\.(woff2?|eot|ttf|otf|svg)(\?.*)?$/,
-        type: 'asset/resource',
-        generator: {
-          filename: 'assets/webfonts/[name][ext]',
-        },
-      },
-      {
-        test: /\.(png|jpe?g|gif|webp)$/i,
-        type: 'asset',
-        parser: {
-          dataUrlCondition: {
-            maxSize: 8 * 1024,
-          },
-        },
-        generator: {
-          filename: 'assets/img/[name][ext]',
-        },
-      },
-      {
-        test: /\.md$/,
-        use: [
-          { loader: "html-loader" },
-          { loader: "markdown-loader" },
-        ]
-      },
+        test: /\.js$/,
+        exclude: /node_modules/,
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-env']
+          }
+        }
+      }
     ]
+  },
+  stats: {
+    errorDetails: true,
+    reasons: true,
+    moduleTrace: true,
   }
 }

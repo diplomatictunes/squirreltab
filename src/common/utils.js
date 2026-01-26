@@ -2,7 +2,7 @@ import _ from 'lodash'
 import __ from './i18n'
 import { formatDistanceToNow, format, isSameYear } from 'date-fns'
 import { enUS, zhCN } from 'date-fns/locale'
-import {COLORS} from './constants'
+import { COLORS } from './constants'
 import browser from 'webextension-polyfill'
 
 // Map your @@ui_locale to date-fns locale objects
@@ -43,8 +43,8 @@ export const one = fn => {
   }
 }
 export const checkPermission = async permission => {
-  if (await browser.permissions.contains({permissions: [permission]})) return true
-  return browser.permissions.request({permissions: [permission]})
+  if (await browser.permissions.contains({ permissions: [permission] })) return true
+  return browser.permissions.request({ permissions: [permission] })
 }
 export const readFile = file => new Promise((resolve, reject) => {
   const reader = new FileReader()
@@ -165,3 +165,12 @@ export class Mutex {
     return willUnlock
   }
 }
+
+export const getDomain = (url) => {
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.replace(/^www\./, '');
+  } catch (e) {
+    return url;
+  }
+};

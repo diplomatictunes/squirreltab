@@ -131,6 +131,12 @@
   "opt_name_disableSearch": {
     "message": "Disable search feature"
   },
+  "opt_name_syncBaseUrl": {
+    "message": "Sync Server Base URL"
+  },
+  "opt_name_syncApiKey": {
+    "message": "Sync Server API Key"
+  },
   "opt_label_popup": {
     "message": "Popup tiny list"
   },

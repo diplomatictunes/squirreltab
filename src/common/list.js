@@ -1,13 +1,14 @@
 import _ from 'lodash'
-import {genObjectId} from './utils'
-import {normalizeTab} from './tab'
-import {PICKED_LIST_RPOPS} from './constants'
+import { genObjectId } from './utils'
+import { normalizeTab } from './tab'
+import { PICKED_LIST_RPOPS } from './constants'
 
-export const createNewTabList = ({_id, tabs, title, tags, time, pinned, expand, color, updatedAt}) => ({
+export const createNewTabList = ({ _id, tabs, title, tags, category, time, pinned, expand, color, updatedAt }) => ({
   _id: _id || genObjectId(),
   tabs: Array.isArray(tabs) ? tabs.map(normalizeTab) : [],
   title: title || '',
   tags: tags || [],
+  category: category || '',
   time: time || Date.now(),
   titleEditing: false,
   pinned: pinned === true, // default is false
@@ -29,4 +30,4 @@ export const normalizeList = list => {
   return normalizedList
 }
 
-export default {createNewTabList, normalizeList, validateList}
+export default { createNewTabList, normalizeList, validateList }

@@ -161,14 +161,14 @@ export const getOptionsList = () => [
     name: 'allContext',
     type: Boolean,
     default: false,
-    deps: ({pageContext}) => pageContext,
+    deps: ({ pageContext }) => pageContext,
     new: '1.3.6',
   },
   {
     cate: cate.BEHAVIOUR,
     name: 'openTabListWhenNewTab',
     desc: true,
-    deps: ({disableDynamicMenu}) => !disableDynamicMenu,
+    deps: ({ disableDynamicMenu }) => !disableDynamicMenu,
     type: Boolean,
     default: false,
   },
@@ -204,6 +204,20 @@ export const getOptionsList = () => [
   },
   */
   // END - Comment out Boss sync options
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'syncBaseUrl',
+    type: String,
+    default: 'http://localhost:8000',
+    new: '1.4.1',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'syncApiKey',
+    type: String,
+    default: '',
+    new: '1.4.1',
+  },
   {
     cate: cate.APPEARANCE,
     name: 'enableSearch',
@@ -301,4 +315,4 @@ export const getOptionsList = () => [
 const _defaultOptions = _.mapValues(_.keyBy(getOptionsList(), 'name'), i => i.default)
 const getDefaultOptions = () => _defaultOptions
 
-export default {getDefaultOptions, getOptionsList}
+export default { getDefaultOptions, getOptionsList }

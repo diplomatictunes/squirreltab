@@ -4,12 +4,13 @@ import tabsHelper from '@/common/tabs'
 import manager from './bridge'
 import _ from 'lodash'
 
-// 1. Define reactive state using Runes
+// 1. Define reactive state using $state rune
 let state = $state({
   lists: [],
   opts: {},
   aiLoading: null,
-  syncing: false
+  syncing: false,
+  snackbar: { status: false, msg: "" }
 });
 
 // 2. Initialization logic
@@ -32,12 +33,9 @@ browser.storage.onChanged.addListener((changes, area) => {
 /**
  * Sync Logic
  */
-
 const debouncedPush = _.debounce(async (listsData) => {
   state.syncing = true;
   try {
-    // Note: To avoid 'connection refused' loops, 
-    // ensure your FastAPI server is running on :3000
     for (const list of listsData) {
       await CustomSync.upload(list);
     }
@@ -49,12 +47,12 @@ const debouncedPush = _.debounce(async (listsData) => {
   }
 }, 2000);
 
-// 3. Watcher for sync (Replaces lists.subscribe)
+// 3. Watcher for sync using $effect runes
+// $effect.root ensures the effect persists even if no components are mounted
 $effect.root(() => {
   $effect(() => {
     if (state.lists.length > 0) {
-      // Use $state.snapshot to send a clean object to the API 
-      // instead of the reactive proxy
+      // $state.snapshot strips the proxy so you send a clean object to the API
       debouncedPush($state.snapshot(state.lists));
     }
   });
@@ -63,14 +61,20 @@ $effect.root(() => {
 /**
  * Exported Interface
  */
-
-// Derived properties (Runes replace 'derived' stores)
 export const syncStore = {
-  // Getters for reactivity
   get lists() { return state.lists; },
   get opts() { return state.opts; },
   get aiLoading() { return state.aiLoading; },
   get syncing() { return state.syncing; },
+  get snackbar() { return state.snackbar; },
+
+  updateSnackbar(payload) {
+    if (typeof payload === 'string') {
+      state.snackbar = { status: true, msg: payload };
+    } else {
+      state.snackbar = payload;
+    }
+  },
 
   get pinnedLists() {
     return state.lists.filter(l => l.pinned);
@@ -118,5 +122,12 @@ export const syncStore = {
   updateList(listId, updates) { manager.updateListById(listId, updates); },
   removeList(listId) { manager.removeListById(listId); },
   pinList(listId, pinned) { manager.updateListById(listId, { pinned }); },
-  changeColor(listId, color) { manager.updateListById(listId, { color }); }
+  changeColor(listId, color) { manager.updateListById(listId, { color }); },
+
+  async cleanAll() {
+    const ids = state.lists.map(l => l._id);
+    for (const id of ids) {
+      manager.removeListById(id);
+    }
+  }
 };

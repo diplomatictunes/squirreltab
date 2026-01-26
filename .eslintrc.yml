@@ -20,3 +20,9 @@ globals:
   PRODUCTION: readonly
   MOZ: readonly
   ga: readonly
+  $state: readonly
+  $effect: readonly
+  $derived: readonly
+  $props: readonly
+  $bindable: readonly
+  $inspect: readonly

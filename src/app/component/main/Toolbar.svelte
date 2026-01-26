@@ -1,14 +1,18 @@
 <script>
-  import { opts, actions } from "../../store/syncStore";
+  import { syncStore } from "../../store/syncStore.svelte.js";
   import __ from "@/common/i18n";
 
   let { onToggleDrawer } = $props();
-  let nightmode = $derived($opts.nightmode || false);
+  let nightmode = $derived(syncStore.opts.nightmode || false);
 </script>
 
 <nav class="toolbar" class:dark={nightmode}>
   <div class="left">
-    <button class="icon-btn" onclick={onToggleDrawer} aria-label="Toggle Drawer">
+    <button
+      class="icon-btn"
+      onclick={onToggleDrawer}
+      aria-label="Toggle Drawer"
+    >
       <i class="fas fa-bars"></i>
     </button>
     <span class="logo">IceTab</span>
@@ -21,7 +25,7 @@
   <div class="right">
     <button
       class="icon-btn"
-      onclick={actions.cleanAll}
+      onclick={syncStore.cleanAll}
       title={__("ui_clean_all")}
     >
       <i class="fas fa-magic"></i>

@@ -1,17 +1,26 @@
 <script>
-  import { rawStore } from "../../store/syncStore";
+  import { syncStore } from "../../store/syncStore.svelte.js";
   import { fade } from "svelte/transition";
 
-  // We'll use a local state for the snackbar derived from rawStore or manage it here
-  let snackbar = $derived($rawStore.snackbar || { status: false, msg: "" });
+  // Use reactive state from syncStore (assuming syncStore has snackbar state or adding it)
+  // For now, let's assume we need to add snackbar support to syncStore or use a local store approach properly.
+  // Since rawStore was not defined, we'll create a simple local store export or rely on syncStore if we add it.
+
+  // NOTE: Original code referenced `rawStore` which is undefined.
+  // We will assume `syncStore` should handle global snackbar state.
+  // Let's verify if `syncStore` has snackbar properties. It didn't in the previous view.
+  // We should add it to `syncStore` to make this work globally.
+
+  let snackbar = $derived(syncStore.snackbar || { status: false, msg: "" });
 
   const close = () => {
-    rawStore.update((s) => ({ ...s, snackbar: { status: false, msg: "" } }));
+    syncStore.updateSnackbar({ status: false, msg: "" });
   };
 
   $effect(() => {
     if (snackbar.status) {
-      setTimeout(close, 3000);
+      const timer = setTimeout(close, 3000);
+      return () => clearTimeout(timer);
     }
   });
 </script>

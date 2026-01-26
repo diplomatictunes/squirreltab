@@ -1,15 +1,14 @@
 <script>
-  import { actions, aiLoading, opts } from "../../store/syncStore";
   import __ from "@/common/i18n";
   import { formatTime, getColorByHash, getDomain } from "@/common/utils";
   import { flip } from "svelte/animate";
   import { fade } from "svelte/transition";
-
+  import { syncStore } from "../../store/syncStore.svelte.js";
   let { lists = [], title = "Tab Lists" } = $props();
 
   // State for pagination
   let currentPage = $state(1);
-  let itemsPerPage = $derived($opts.listsPerPage || 10);
+  let itemsPerPage = $derived(syncStore.opts.listsPerPage || 10);
   let pageCount = $derived(Math.ceil(lists.length / itemsPerPage));
   let paginatedLists = $derived(
     lists.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
@@ -33,22 +32,22 @@
   };
 
   const handleCleanAll = async () => {
-    await actions.cleanAll();
+    await syncStore.cleanAll();
   };
 
   const handleCategorize = async (index, e) => {
     e.stopPropagation();
-    await actions.categorizeList(index);
+    await syncStore.categorizeList(index);
   };
 
   const handlePin = (id, pinned, e) => {
     e.stopPropagation();
-    actions.pinList(id, pinned);
+    syncStore.pinList(id, pinned);
   };
 
   const handleRemove = (id, e) => {
     e.stopPropagation();
-    actions.removeList(id);
+    syncStore.removeList(id);
   };
 </script>
 
@@ -66,7 +65,7 @@
       <div
         class="tab-list-card"
         class:pinned={list.pinned}
-        class:ai-suggested={$aiLoading === list._id}
+        class:ai-suggested={syncStore.aiLoading === list._id}
         animate:flip={{ duration: 300 }}
       >
         <div
@@ -103,10 +102,12 @@
             </button>
             <button
               onclick={(e) => handleCategorize(i, e)}
-              disabled={$aiLoading === list._id}
+              disabled={syncStore.aiLoading === list._id}
               aria-label="Categorize list"
             >
-              <i class="fas fa-robot" class:loading={$aiLoading === list._id}
+              <i
+                class="fas fa-robot"
+                class:loading={syncStore.aiLoading === list._id}
               ></i>
             </button>
             <button
@@ -126,7 +127,7 @@
                 <div class="tab-item">
                   <img
                     src={tab.favIconUrl ||
-                      `https://www.google.com/s2/favicons?domain=${getDomain(tab.url)}`}
+                      `https://www.google.com/s2/favicons?domain={getDomain(tab.url)}`}
                     alt=""
                     class="favicon"
                   />
@@ -138,7 +139,7 @@
               {/each}
             </div>
             <div class="list-footer">
-              <button onclick={() => actions.restoreList(list._id)}
+              <button onclick={() => syncStore.restoreList(list._id)}
                 >{__("ui_restore_all")}</button
               >
             </div>

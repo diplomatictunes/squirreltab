@@ -94,6 +94,12 @@ const storeTabs = async (tabs, listIndex) => {
   return browser.tabs.remove(tabs.map(i => i.id))
 }
 
+const storeCurrentTab = async listIndex => {
+  const tabs = await browser.tabs.query({active: true, currentWindow: true})
+  if (!tabs || tabs.length === 0) throw new Error('No active tab to stash')
+  return storeTabs(tabs, listIndex)
+}
+
 const storeLeftTabs = async listIndex => storeTabs((await groupTabsInCurrentWindow()).left, listIndex)
 const storeRightTabs = async listIndex => storeTabs((await groupTabsInCurrentWindow()).right, listIndex)
 const storeTwoSideTabs = async listIndex => storeTabs((await groupTabsInCurrentWindow()).twoSide, listIndex)
@@ -171,6 +177,7 @@ export default {
   storeTwoSideTabs,
   storeAllTabs,
   storeAllTabInAllWindows,
+  storeCurrentTab,
   restoreTabs,
   restoreList,
   restoreListInNewWindow,

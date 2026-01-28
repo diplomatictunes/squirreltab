@@ -20,6 +20,17 @@ export const SYNC_SERVICE_URL = DEBUG ? 'http://127.0.0.1:8000' : 'https://boss.
 export const SYNC_MAX_INTERVAL = 864e5
 export const SYNC_MIN_INTERVAL = 3e5
 
+export const SYNC_PHASES = {
+  IDLE: 'idle',
+  SYNCING: 'syncing',
+  SYNCED: 'synced',
+  AUTH_ERROR: 'auth-error',
+  OFFLINE: 'offline',
+  SERVER_ERROR: 'server-error',
+  NEVER_SYNCED: 'never-synced',
+  LOCAL_ONLY: 'local-only',
+}
+
 export const ADD_LIST = 'addList'
 export const UPDATE_LIST_BY_ID = 'updateListById'
 export const REMOVE_LIST_BY_ID = 'removeListById'

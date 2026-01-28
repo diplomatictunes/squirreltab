@@ -63,7 +63,7 @@ module.exports = {
           to: 'manifest.json',
           // The broken transform function has been removed to ensure a clean copy.
         },
-        { from: 'src/assets/icons', to: 'assets/icons' },
+        { from: 'src/assets', to: 'assets' },
         { from: 'src/_locales', to: '_locales' },
         { from: 'src/gdrive_sandbox.html', to: 'gdrive_sandbox.html' },
       ],
@@ -127,7 +127,8 @@ module.exports = {
           loader: 'svelte-loader',
           options: {
             compilerOptions: {
-              dev: isDevelopment
+              dev: isDevelopment,
+              runes: true,
             },
             emitCss: true,
             hotReload: false
@@ -140,7 +141,8 @@ module.exports = {
           loader: 'svelte-loader',
           options: {
             compilerOptions: {
-              dev: isDevelopment
+              dev: isDevelopment,
+              runes: true,
             },
             emitCss: false,
             hotReload: false

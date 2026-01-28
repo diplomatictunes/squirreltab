@@ -9,7 +9,6 @@
     ]
   ],
   "plugins": [
-    "@babel/plugin-syntax-dynamic-import",
-    "lodash"
+    "@babel/plugin-syntax-dynamic-import"
   ]
 }

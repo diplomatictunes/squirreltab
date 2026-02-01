@@ -147,8 +147,12 @@ const scheduleSync = (reason = 'change', { immediate = false, listsOverride = nu
   const signature = signatureOverride || buildSignature(lists)
   if (!force && signature === state.lastSyncedSignature) return
   pendingPayload = { lists, signature, reason }
-  state.localOnly = true
+  // FIX (Bug 2): Only mark as LOCAL_ONLY if we are not already in an
+  // in-flight or error state.  The badge will flip to SYNCING as soon as
+  // pushStateToServer actually runs, so we only need a brief LOCAL_ONLY
+  // window when transitioning from a stable state.
   if ([SYNC_PHASES.SYNCED, SYNC_PHASES.IDLE, SYNC_PHASES.NEVER_SYNCED].includes(state.syncPhase)) {
+    state.localOnly = true
     state.syncPhase = SYNC_PHASES.LOCAL_ONLY
   }
   if (immediate) {
@@ -168,9 +172,16 @@ const hydrateFromRemote = async () => {
     const remoteLists = Array.isArray(response?.lists) ? response.lists : []
     const normalizedRemote = remoteLists.map(mapRemoteList)
     const remoteVersion = parseRemoteVersion(response?.updated_at) || computeVersion(normalizedRemote)
-    const localSnapshot = $state.snapshot(state.lists)
-    const localVersion = computeVersion(localSnapshot)
     state.remoteVersion = remoteVersion
+
+    // FIX (Bug 1): Re-read local storage RIGHT NOW instead of relying on
+    // the snapshot that was taken before the network round-trip.  A stash
+    // operation (or any other write) may have completed while we were
+    // waiting for the server to respond.  Using a stale snapshot here would
+    // cause us to clobber freshly-stashed tabs with the (older) remote set.
+    const freshLocalData = await browser.storage.local.get('lists')
+    const localSnapshot = Array.isArray(freshLocalData.lists) ? freshLocalData.lists : []
+    const localVersion = computeVersion(localSnapshot)
 
     if (remoteVersion > localVersion) {
       const signature = buildSignature(normalizedRemote)
@@ -181,14 +192,14 @@ const hydrateFromRemote = async () => {
       state.syncError = null
       await storage.setLists(normalizedRemote)
       state.lastSyncedAt = Date.now()
-       state.syncPhase = SYNC_PHASES.SYNCED
-       logSyncEvent('hydrate_success', {
-         action: 'downloaded',
-         remoteLists: normalizedRemote.length,
-         localLists: localSnapshot.length,
-         remoteVersion,
-         localVersion,
-       })
+      state.syncPhase = SYNC_PHASES.SYNCED
+      logSyncEvent('hydrate_success', {
+        action: 'downloaded',
+        remoteLists: normalizedRemote.length,
+        localLists: localSnapshot.length,
+        remoteVersion,
+        localVersion,
+      })
     } else if (localVersion > remoteVersion && localSnapshot.length) {
       state.localOnly = true
       state.syncPhase = SYNC_PHASES.LOCAL_ONLY
@@ -199,7 +210,7 @@ const hydrateFromRemote = async () => {
         remoteVersion,
         localVersion,
       })
-      scheduleSync('remote-behind', { immediate: true, listsOverride: localSnapshot, signatureOverride: buildSignature(localSnapshot) })
+      scheduleSync('remote-behind', { immediate: true, listsOverride: localSnapshot, signatureOverride: buildSignature(localSnapshot), force: true })
     } else {
       state.localOnly = false
       state.syncPhase = SYNC_PHASES.SYNCED
@@ -237,6 +248,8 @@ const hydrateFromRemote = async () => {
     // Ensure initialized is true so the UI knows it's okay to render
     state.initialized = true 
   }
+}
+
 const initStore = async (retries = 3) => {
   let shouldFinalize = true
   try {
@@ -440,4 +453,3 @@ browser.runtime.onMessage.addListener(message => {
     syncStore.updateSnackbar(msg)
   }
 })
-

@@ -9,27 +9,26 @@
 // import storage from '../storage'
 // import listManager from '../listManager'
 // import {isBackground, timeout, sendMessage} from '../utils'
-// import browser from 'webextension-polyfill'
-// import io from 'socket.io-client'
+// // import io from 'socket.io-client'
 // import logger from '../logger'
 
-// const hasToken = async () => TOKEN_KEY in await browser.storage.local.get(TOKEN_KEY)
+// const hasToken = async () => TOKEN_KEY in await chrome.storage.local.get(TOKEN_KEY)
 
 // const getToken = async () => {
-//   const {token: localToken} = await browser.storage.local.get(TOKEN_KEY)
+//   const {token: localToken} = await chrome.storage.local.get(TOKEN_KEY)
 //   if (localToken) return localToken
-//   const {token: remoteToken} = await browser.storage.sync.get(TOKEN_KEY)
+//   const {token: remoteToken} = await chrome.storage.sync.get(TOKEN_KEY)
 //   if (remoteToken) return remoteToken
 // }
 
 // const setToken = async token => {
-//   await browser.storage.local.set({[TOKEN_KEY]: token, tokenIssued: Date.now()})
-//   await browser.storage.sync.set({[TOKEN_KEY]: token})
+//   await chrome.storage.local.set({[TOKEN_KEY]: token, tokenIssued: Date.now()})
+//   await chrome.storage.sync.set({[TOKEN_KEY]: token})
 // }
 
 // const removeToken = async () => {
-//   await browser.storage.local.remove(TOKEN_KEY)
-//   await browser.storage.sync.remove(TOKEN_KEY)
+//   await chrome.storage.local.remove(TOKEN_KEY)
+//   await chrome.storage.sync.remove(TOKEN_KEY)
 // }
 
 // const fetchData = async (uri = '', method = 'GET', data = {}) => {
@@ -87,7 +86,7 @@
 // const uploadOpsViaWS = async () => {
 //   const socket = self._socket
 //   if (!socket || !socket.connected) throw new Error('socket not connected')
-//   const {ops} = await browser.storage.local.get('ops')
+//   const {ops} = await chrome.storage.local.get('ops')
 //   if (ops) {
 //     const changes = ops.sort((a, b) => a.time - b.time)
 //     while (changes && changes.length) {
@@ -95,14 +94,14 @@
 //       await _socketEmitTimeout(socket, 'list.update', change)
 //     }
 //   }
-//   await browser.storage.local.remove('ops')
+//   await chrome.storage.local.remove('ops')
 // }
 
 // const downloadRemoteLists = async () => {
 //   const socket = self._socket
 //   if (!socket || !socket.connected) throw new Error('socket not connected')
 //   const remoteTime = await _socketEmitTimeout(socket, 'list.time')
-//   const {listsUpdatedAt: localTime} = await browser.storage.local.get('listsUpdatedAt')
+//   const {listsUpdatedAt: localTime} = await chrome.storage.local.get('listsUpdatedAt')
 //   if (remoteTime === localTime) return
 //   const remoteLists = await _socketEmitTimeout(socket, 'list.all')
 //   const localLists = _.keyBy(await storage.getLists(), list => list._id)
@@ -125,7 +124,7 @@
 //   }
 //   console.log(finallyLists)
 //   await storage.setLists(finallyLists)
-//   await browser.storage.local.set({listsUpdatedAt: remoteTime})
+//   await chrome.storage.local.set({listsUpdatedAt: remoteTime})
 // }
 
 // const syncLists = async () => {
@@ -146,10 +145,10 @@
 
 // const syncOptions = async () => {
 //   const remoteTime = await getRemoteOptionsUpdatedTimeViaWS()
-//   const {optsUpdatedAt: localTime} = await browser.storage.local.get('optsUpdatedAt')
+//   const {optsUpdatedAt: localTime} = await chrome.storage.local.get('optsUpdatedAt')
 //   if (remoteTime > localTime) {
 //     const opts = await getRemoteOptions()
-//     await browser.storage.local.set({opts, optsUpdatedAt: remoteTime})
+//     await chrome.storage.local.set({opts, optsUpdatedAt: remoteTime})
 //   } else if (remoteTime < localTime) {
 //     const opts = await storage.getOptions()
 //     await setRemoteOptions(opts, localTime)
@@ -195,14 +194,14 @@
 //   const {uid} = await getInfo()
 //   await sendMessage({logged: {uid}})
 //   const loginNotificationId = 'login'
-//   browser.notifications.create(loginNotificationId, {
+//   chrome.notifications.create(loginNotificationId, {
 //     type: 'basic',
 //     iconUrl: 'assets/icons/icon128.png',
 //     title: 'you have login to boss successfully',
 //     message: '',
 //   })
 //   setTimeout(() => {
-//     browser.notifications.clear(loginNotificationId)
+//     chrome.notifications.clear(loginNotificationId)
 //   }, 5000)
 //   await refresh()
 // }
@@ -240,7 +239,7 @@
 //   // window.addEventListener('offline', () => _refreshTimer(SYNC_MAX_INTERVAL))
 //   // window.addEventListener('online', () => _refreshTimer(SYNC_MIN_INTERVAL))
 
-//   browser.runtime.onMessage.addListener(({login, refreshed}) => {
+//   chrome.runtime.onMessage.addListener(({login, refreshed}) => {
 //     if (login || refreshed && refreshed.success) self._nextSyncInterval = SYNC_MIN_INTERVAL
 //   })
 //   _nextTimer(SYNC_MIN_INTERVAL)
@@ -259,11 +258,11 @@
 //     listManager[method](...args)
 //   })
 //   _socket.on('opts.set', async ({changes, time}) => {
-//     const {opts} = await browser.storage.local.get('opts')
+//     const {opts} = await chrome.storage.local.get('opts')
 //     for (const [k, v] of Object.entries(changes)) {
 //       opts[k] = v
 //     }
-//     await browser.storage.local.set({opts, optsUpdatedAt: time})
+//     await chrome.storage.local.set({opts, optsUpdatedAt: time})
 //   })
 //   _socket.on('connect', () => refresh())
 //   _socket.open()

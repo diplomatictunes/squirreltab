@@ -1,6 +1,5 @@
 // src/common/service/gdrive.js
 import _ from 'lodash'
-import browser from 'webextension-polyfill'
 
 const GOOGLE_ACCESS_TOKEN_KEY = 'at'
 const clearToken = () => {
@@ -89,7 +88,7 @@ const saveToDriveInSandbox = (data, token) => new Promise((resolve, reject) => {
 
 const saveCurrentTabLists = async () => {
   try {
-    const { lists } = await browser.storage.local.get('lists')
+    const { lists } = await chrome.storage.local.get('lists')
     if (_.isEmpty(lists)) {
       console.log('No lists to save.')
       return { success: false, message: 'No lists saved.' }

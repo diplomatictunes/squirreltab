@@ -35,6 +35,9 @@
   "menu_STORE_TO_TITLED_LIST": {
     "message": "store into a titled list"
   },
+  "menu_SAVE_TAB_TO_SPINE": {
+    "message": "Save tab to IceTab"
+  },
   "cmd_store_selected_tabs": {
     "message": "Store selected tabs"
   },

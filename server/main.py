@@ -42,7 +42,7 @@ class TabItem(BaseModel):
     title: str
     url: str
     favIconUrl: Optional[str] = ""
-    pinned: Optional[bool] = False
+    pinned: Optional[bool] = None
 
 class TabListSchema(BaseModel):
     remote_id: str
@@ -96,14 +96,15 @@ def startup_event():
 def root():
     return {"status": "running", "version": "2.0.0"}
 
+
 @app.get("/health")
 def health_check():
     return {
-        "status": "ok",
-        "time": datetime.datetime.utcnow().isoformat(),
-        "ai_enabled": OPENAI_API_KEY is not None
+        "status": "success",
+        "service": "SquirrlTab Sync",
+        "version": "1.0.0"
     }
-
+    
 # FIXED: Pull Endpoint (Removed user.username)
 @app.get("/sync/pull")
 def pull_tabs(user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
@@ -137,50 +138,40 @@ def pull_tabs(user: User = Depends(get_user_by_api_key), db: Session = Depends(g
         logger.error(f"Error pulling tabs: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-
 @app.post("/sync/push")
-def push_tabs(data: TabListSchema, user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
-    try:
-        logger.info(f"Incremental push from user {user.id} for list {data.remote_id}")
-        updated_dt = epoch_ms_to_dt(data.updated_at or data.time)
-
-        # Check if this specific list already exists
-        existing = db.query(TabList).filter(
-            TabList.user_id == user.id,
-            TabList.remote_id == data.remote_id
-        ).first()
-
-        if existing:
-            existing.title = data.title
-            existing.tabs = json.dumps([t.dict() for t in data.tabs])
-            existing.category = data.category
-            existing.tags = json.dumps(data.tags) if data.tags else json.dumps([])
-            existing.time = data.time
-            existing.pinned = bool(data.pinned)
-            existing.color = data.color
-            existing.updated_at = updated_dt
-        else:
-            new_list = TabList(
-                user_id=user.id,
-                remote_id=data.remote_id,
-                title=data.title,
-                tabs=json.dumps([t.dict() for t in data.tabs]),
-                category=data.category,
-                tags=json.dumps(data.tags) if data.tags else json.dumps([]),
-                time=data.time,
-                pinned=bool(data.pinned),
-                color=data.color,
-                updated_at=updated_dt
-            )
-            db.add(new_list)
-
-        user.last_synced_at = datetime.datetime.utcnow()
-        db.commit()
-        return {"status": "success", "remote_id": data.remote_id}
-    except Exception as e:
-        logger.error(f"Error in incremental push: {str(e)}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Push failed")
+def push_single_list(data: TabListSchema, user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
+    # The extension sends a single list object here
+    existing = db.query(TabList).filter(
+        TabList.remote_id == data.remote_id, 
+        TabList.user_id == user.id
+    ).first()
+    
+    tabs_data = json.dumps([t.dict() for t in data.tabs])
+    
+    if existing:
+        existing.title = data.title
+        existing.tabs = tabs_data
+        existing.category = data.category
+        existing.tags = json.dumps(data.tags)
+        existing.time = data.time
+        existing.pinned = data.pinned
+        existing.color = data.color
+    else:
+        new_list = TabList(
+            user_id=user.id,
+            remote_id=data.remote_id,
+            title=data.title,
+            tabs=tabs_data,
+            category=data.category,
+            tags=json.dumps(data.tags),
+            time=data.time,
+            pinned=data.pinned,
+            color=data.color
+        )
+        db.add(new_list)
+    
+    db.commit()
+    return {"status": "success"}
 
 # FIXED: State/Replace Endpoint (Removed user.username)
 @app.post("/sync/state")

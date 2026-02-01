@@ -1,12 +1,11 @@
 import _ from 'lodash'
 import {normalizeList} from '@/common/list'
-import browser from 'webextension-polyfill'
 import options from './options'
 
-const get = key => browser.storage.local.get(key)
+const get = key => chrome.storage.local.get(key)
   .then(result => (result && typeof result[key] !== 'undefined') ? result[key] : null)
 
-const set = obj => browser.storage.local.set(obj)
+const set = obj => chrome.storage.local.set(obj)
 
 const getLists = () => get('lists').then(lists => lists || [])
 

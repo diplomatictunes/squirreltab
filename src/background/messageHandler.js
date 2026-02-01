@@ -1,14 +1,12 @@
 import tabs from '../common/tabs'
 import storage from '../common/storage'
 // import boss from '../common/service/boss' // Keep import commented if you previously uncommented it for boss.js
-import {sendMessage} from '../common/utils'
+import { sendMessage } from '../common/utils'
 import listManager from '../common/listManager'
-import {setupContextMenus} from './contextMenus'
-import {updateBrowserAction} from './browserAction'
-import browser from 'webextension-polyfill'
-import {ILLEGAL_URLS, RUNTIME_MESSAGES} from '../common/constants'
-
-const getExtensionUrlPrefix = () => browser.runtime.getURL('')
+import { setupContextMenus } from './contextMenus'
+import { updateBrowserAction } from './browserAction'
+import { ILLEGAL_URLS, RUNTIME_MESSAGES } from '../common/constants'
+const getExtensionUrlPrefix = () => chrome.runtime.getURL('')
 
 const isBlockedStashTarget = url => {
   if (!url) return true
@@ -18,7 +16,7 @@ const isBlockedStashTarget = url => {
 }
 
 const emitStashEvent = (type, payload) => {
-  return browser.runtime.sendMessage({
+  return chrome.runtime.sendMessage({
     type,
     payload,
   }).catch(() => {
@@ -28,7 +26,7 @@ const emitStashEvent = (type, payload) => {
 
 const handleStashCurrentTabIntent = async (source = 'app') => {
   try {
-    const [activeTab] = await browser.tabs.query({active: true, currentWindow: true})
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
     if (!activeTab || !activeTab.id) {
       throw new Error('NO_ACTIVE_TAB')
     }
@@ -53,6 +51,18 @@ const handleStashCurrentTabIntent = async (source = 'app') => {
 
 const messageHandler = async msg => {
   if (!msg) return
+
+  if (msg.type === "REQUEST_SAVE_TAB") {
+    await tabs.storeCurrentTab()
+
+    chrome.runtime.sendMessage({
+      type: "LISTS_UPDATED",
+    })
+
+    return
+  }
+
+
   if (msg.type === RUNTIME_MESSAGES.STASH_COMPLETED || msg.type === RUNTIME_MESSAGES.STASH_FAILED) {
     return
   }
@@ -74,10 +84,10 @@ const messageHandler = async msg => {
     if (['pageContext', 'allContext', 'disableDynamicMenu'].some(k => k in changes)) {
       await setupContextMenus(latestOpts)
     }
-    await sendMessage({optionsChangeHandledStatus: 'success'})
+    await sendMessage({ optionsChangeHandledStatus: 'success' })
   }
   if (msg.restoreList) {
-    const {restoreList} = msg
+    const { restoreList } = msg
     const listIndex = restoreList.index
     const lists = await storage.getLists()
     const list = lists[listIndex]
@@ -101,10 +111,14 @@ const messageHandler = async msg => {
     boss.refresh()
   }
   */
-  if (msg.import) {
-    const {lists} = msg.import
+    if (msg.import) {
+    const { lists } = msg.import
     lists.forEach(list => listManager.addList(list))
+
+    chrome.runtime.sendMessage({
+      type: "LISTS_UPDATED",
+    })
+    return
   }
 }
-
 export default messageHandler

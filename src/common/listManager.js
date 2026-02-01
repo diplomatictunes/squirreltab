@@ -1,4 +1,3 @@
-import browser from 'webextension-polyfill'
 import {
   SYNCED_LIST_PROPS,
   END_FRONT,
@@ -15,7 +14,7 @@ const RWLock = new Mutex()
 const getStorage = async () => {
   const unlockRW = await RWLock.lock()
   if (cache.lists && cache.ops) return cache
-  const {lists, ops} = await browser.storage.local.get(['lists', 'ops'])
+  const {lists, ops} = await chrome.storage.local.get(['lists', 'ops'])
   cache.lists = lists || []
   cache.ops = ops || []
   await unlockRW()
@@ -103,7 +102,7 @@ const saveStorage = async (lists, ops) => {
     lists,
     ops: compressOps(ops)
   }
-  await browser.storage.local.set(data)
+  await chrome.storage.local.set(data)
   cache.lists = cache.ops = null
   await sendMessage({refresh: true})
   await unlock()
@@ -134,7 +133,7 @@ const applyChangesToStorage = async (method, args) => {
   _working = false
   await saveStorage(lists, ops)
 }
-const addEventListener = (receiveFrom, callback) => browser.runtime.onMessage.addListener(({listModifed, from}) => {
+const addEventListener = (receiveFrom, callback) => chrome.runtime.onMessage.addListener(({listModifed, from}) => {
   if (receiveFrom !== from || !listModifed) return
   const {method, args} = listModifed
   return callback(method, args)
@@ -173,7 +172,7 @@ manager.createVuexPlugin = () => store => {
   addEventListener(END_BACKGROUND, (method, args) => {
     store.commit('receiveData', {method, args})
   })
-  browser.runtime.onMessage.addListener(({refreshed}) => {
+  chrome.runtime.onMessage.addListener(({refreshed}) => {
     if (refreshed && refreshed.success) store.dispatch('getLists')
   })
   store.subscribe(({type, payload}) => {

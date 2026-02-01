@@ -3,7 +3,6 @@ import __ from './i18n'
 import { formatDistanceToNow, format, isSameYear } from 'date-fns'
 import { enUS, zhCN } from 'date-fns/locale'
 import { COLORS } from './constants'
-import browser from 'webextension-polyfill'
 
 // Map your @@ui_locale to date-fns locale objects
 const dateFnsLocales = {
@@ -43,8 +42,8 @@ export const one = fn => {
   }
 }
 export const checkPermission = async permission => {
-  if (await browser.permissions.contains({ permissions: [permission] })) return true
-  return browser.permissions.request({ permissions: [permission] })
+  if (await chrome.permissions.contains({ permissions: [permission] })) return true
+  return chrome.permissions.request({ permissions: [permission] })
 }
 export const readFile = file => new Promise((resolve, reject) => {
   const reader = new FileReader()
@@ -88,7 +87,7 @@ export const compareVersion = (a, b) => {
 
 export const sendMessage = async msg => {
   try {
-    await browser.runtime.sendMessage(msg)
+    await chrome.runtime.sendMessage(msg)
   } catch (err) {
     if (err.message === 'Could not establish connection. Receiving end does not exist.') {
       return console.warn('error ignored', err.message)

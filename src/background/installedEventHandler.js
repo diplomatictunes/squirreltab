@@ -1,23 +1,22 @@
 import __ from '../common/i18n'
-import browser from 'webextension-polyfill'
 
 const installedEventHandler = detail => {
   if (DEBUG) return
   if (detail.reason === chrome.runtime.OnInstalledReason.UPDATE) {
     const updatedNotificationId = 'updated'
-    browser.notifications.onClicked.addListener(id => {
+    chrome.notifications.onClicked.addListener(id => {
       if (id === updatedNotificationId) {
-        browser.tabs.create({ url: 'https://github.com/elijahcommits/icetab/blob/master/CHANGELOG.md' })
+        chrome.tabs.create({ url: 'https://github.com/elijahcommits/icetab/blob/master/CHANGELOG.md' })
       }
     })
-    browser.notifications.create(updatedNotificationId, {
+    chrome.notifications.create(updatedNotificationId, {
       type: 'basic',
       iconUrl: 'assets/icons/icon128.png',
-      title: __('ui_updated_to_ver') + ' v' + browser.runtime.getManifest().version,
+      title: __('ui_updated_to_ver') + ' v' + chrome.runtime.getManifest().version,
       message: __('ui_click_view_changelog'),
     })
     setTimeout(() => {
-      browser.notifications.clear(updatedNotificationId)
+      chrome.notifications.clear(updatedNotificationId)
     }, 5000)
   }
 }

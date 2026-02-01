@@ -35,6 +35,9 @@
   "menu_STORE_TO_TITLED_LIST": {
     "message": "储存至"
   },
+  "menu_SAVE_TAB_TO_SPINE": {
+    "message": "保存标签页到 IceTab"
+  },
   "cmd_store_selected_tabs": {
     "message": "保存已选中标签页"
   },

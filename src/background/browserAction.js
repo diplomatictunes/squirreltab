@@ -1,50 +1,20 @@
-import _ from 'lodash'
 import tabs from '../common/tabs'
-import options from '../common/options'
-import browser from 'webextension-polyfill'
-import storage from '../common/storage'
 
-// Module-level variables instead of window.
-let currentBrowserAction = ''
-let coverBrowserActionFn = _.noop // Replaced empty arrow function with _.noop
-
-const actions = {
-  'store-selected': tabs.storeSelectedTabs,
-  'show-list': tabs.openTabLists,
-  'store-all': tabs.storeAllTabs,
-  'store-all-in-all-windows': tabs.storeAllTabInAllWindows,
-}
-
-export const getBrowserActionHandler = action => actions[action] || _.noop // Replaced empty arrow function with _.noop
-
-export const updateBrowserAction = async (action, tmp = false) => {
-  if (!tmp) currentBrowserAction = action
-
-  coverBrowserActionFn = _.noop
-
-  const {items} = _.find(options.getOptionsList(), {name: 'browserAction'})
-  const {label} = _.find(items, {value: action})
-  console.log('action is: ', action, 'set title as: ', label)
-  await browser.action.setTitle({title: label})
-
-  if (action === 'popup') {
-    // Correct the path here to match what's in your manifest
-    await browser.action.setPopup({popup: 'index.html?context=popup'})
+export const updateBrowserAction = async (action) => {
+  if (action && action !== 'popup') {
+    await chrome.action.setPopup({ popup: '' })
   } else {
-    await browser.action.setPopup({popup: ''})
-
-    const opts = await storage.getOptions()
-    if (opts.openTabListWhenNewTab) {
-      coverBrowserActionFn = async activeInfo => {
-        const tab = await browser.tabs.get(activeInfo.tabId)
-        if (['about:home', 'about:newtab', 'chrome://newtab/'].includes(tab.url)) {
-          return updateBrowserAction('show-list', true)
-        } else {
-          return updateBrowserAction(currentBrowserAction)
-        }
-      }
-    }
+    await chrome.action.setPopup({ popup: 'index.html?context=popup' })
   }
 }
 
-export const getCoverBrowserAction = () => coverBrowserActionFn
+export const getBrowserActionHandler = (action) => {
+  const handlers = {
+    'store-selected': tabs.storeSelectedTabs,
+    'store-all': tabs.storeAllTabs,
+    'show-list': tabs.openTabLists,
+  }
+  return handlers[action] || null
+}
+
+export const getCoverBrowserAction = () => { }

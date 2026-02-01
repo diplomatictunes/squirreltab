@@ -1,19 +1,18 @@
 /* eslint-disable */
 import _ from 'lodash'
-// import logger from '../common/logger' // The logger has been temporarily disabled for debugging
+import tabs from '../common/tabs'
 import options from '../common/options'
 import storage from '../common/storage'
 import migrate from '../common/migrate'
 import boss from '../common/service/boss' // Keep import as it's commented out in boss.js
-import {normalizeList} from '../common/list'
+import { normalizeList } from '../common/list'
 import commandHandler from './commandHandler'
 import messageHandler from './messageHandler'
 import listManager from '../common/listManager'
-import {setupContextMenus, dynamicDisableMenu, handleContextMenuClicked} from './contextMenus'
+import { setupContextMenus, dynamicDisableMenu, handleContextMenuClicked } from './contextMenus'
 import installedEventHandler from './installedEventHandler'
-import {updateBrowserAction, getBrowserActionHandler, getCoverBrowserAction} from './browserAction'
+import { updateBrowserAction, getBrowserActionHandler, getCoverBrowserAction } from './browserAction'
 
-import browser from 'webextension-polyfill'
 
 // Global variables for the service worker context
 let opts_global = {};
@@ -68,10 +67,10 @@ const tabsChangedHandler = async activeInfo => {
 
 const fixDirtyData = async () => {
   const unlock = await listManager.RWLock.lock()
-  const {lists} = await browser.storage.local.get('lists')
+  const { lists } = await chrome.storage.local.get('lists')
   if (lists) {
     const cleanLists = lists.filter(_.isPlainObject).map(normalizeList)
-    await browser.storage.local.set({lists: cleanLists})
+    await chrome.storage.local.set({ lists: cleanLists })
   }
   await unlock()
 }
@@ -81,20 +80,32 @@ const init = async () => {
     // await logger.init() // The logger has been temporarily disabled for debugging
     await listManager.init()
     const opts = await initOptions()
-    await updateBrowserAction(opts.browserAction)
     await setupContextMenus(opts)
+    if (chrome?.contextMenus?.onClicked && !chrome.contextMenus.onClicked.hasListener(handleContextMenuClicked)) {
+      chrome.contextMenus.onClicked.addListener(handleContextMenuClicked)
+    }
 
-    browser.runtime.onInstalled.addListener(async () => {
+    chrome.runtime.onInstalled.addListener(async () => {
       const opts = await initOptions();
       await setupContextMenus(opts);
     });
-    if (browser.commands) {
-      browser.commands.onCommand.addListener(commandHandler)
-    } else {
-      console.warn("browser.commands API is not available. Keyboard shortcuts may not work.");
-    }
-    browser.runtime.onMessageExternal.addListener(commandHandler)
-    browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  const isServiceWorker =
+    typeof chrome !== "undefined" &&
+    chrome.runtime &&
+    chrome.runtime.id &&
+    !chrome.extension?.getViews?.({ type: "popup" })?.length;
+
+
+  // Around line 99
+  if (typeof chrome.commands !== 'undefined' && chrome.commands.getAll) {
+      chrome.commands.getAll((commands) => {
+          // ... existing internal logic if there was any ...
+      });
+  } else {
+      console.log("Commands API not available, skipping initialization of shortcuts.");
+  }
+    chrome.runtime.onMessageExternal.addListener(commandHandler)
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg.type === 'getGlobalState') {
         if (msg.key === 'drawer') {
           sendResponse({ [msg.key]: drawer_global });
@@ -122,16 +133,17 @@ const init = async () => {
 
       messageHandler(msg);
     });
-    browser.runtime.onUpdateAvailable.addListener(detail => { updateVersion_global = detail.version })
-    browser.action.onClicked.addListener(async () => {
-      const handler = getBrowserActionHandler(opts_global.browserAction);
+    chrome.runtime.onUpdateAvailable.addListener(detail => { updateVersion_global = detail.version })
+    chrome.action.onClicked.addListener(async () => {
+      const handler = getBrowserActionHandler(opts_global.browserAction)
       if (handler) {
-        await handler();
+        await handler()
       }
     });
-    browser.contextMenus.onClicked.addListener(info => handleContextMenuClicked(info));
-    browser.tabs.onActivated.addListener(_.debounce(tabsChangedHandler, 200));
-    browser.storage.onChanged.addListener(storageChangedHandler);
+    chrome.tabs.onActivated.addListener(_.debounce(tabsChangedHandler, 200));
+    chrome.storage.onChanged.addListener(storageChangedHandler);
+
+
 
     await migrate()
     await fixDirtyData()

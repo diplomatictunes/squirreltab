@@ -44,11 +44,14 @@
    "menu_STORE_SELECTED_TABS": {
      "message":"Speichere ausgewählte Tabs"
    },
-   "menu_STORE_TO_TITLED_LIST": {
-     "message":"Speichere in benannte Liste"
-   },
-   "menu_STORE_TWOSIDE_TABS": {
-     "message":"Speichere nicht ausgewählte Tabs"
+  "menu_STORE_TO_TITLED_LIST": {
+    "message":"Speichere in benannte Liste"
+  },
+  "menu_SAVE_TAB_TO_SPINE": {
+    "message":"Tab in IceTab speichern"
+  },
+  "menu_STORE_TWOSIDE_TABS": {
+    "message":"Speichere nicht ausgewählte Tabs"
    },
    "opt_desc_openTabListWhenNewTab": {
      "message":"Öffne die Registerkartenliste immer beim Klicken auf das Symbol, wenn die aktuelle Registerkarte eine neue Registerkarte ist. (Funktioniert nicht, wenn das Verhalten auf \"einfache Popup-Liste\" eingestellt ist."

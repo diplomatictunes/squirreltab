@@ -217,6 +217,15 @@ const hydrateFromRemote = async () => {
     state.syncError = normalized
     state.lastSyncSuccess = false
     state.localOnly = true
+    
+    // FORCE LOCAL DATA TO PERSIST
+    // This prevents the UI from clearing or hiding the lists 
+    // just because the server at localhost:8000 is down.
+    if (state.lists.length === 0) {
+       const data = await browser.storage.local.get('lists');
+       state.lists = Array.isArray(data.lists) ? data.lists : [];
+    }
+
     logSyncEvent('hydrate_failed', {
       code: normalized.code,
       phase: normalized.phase,
@@ -225,9 +234,9 @@ const hydrateFromRemote = async () => {
     console.error('[SquirrlTab] Failed to hydrate remote state:', error)
   } finally {
     state.syncing = false
+    // Ensure initialized is true so the UI knows it's okay to render
+    state.initialized = true 
   }
-}
-
 const initStore = async (retries = 3) => {
   let shouldFinalize = true
   try {
@@ -283,6 +292,7 @@ $effect.root(() => {
     scheduleSync('change', { listsOverride: snapshot, signatureOverride: signature })
   })
 })
+  
 
 export const syncStore = {
   get lists() {
@@ -430,3 +440,4 @@ browser.runtime.onMessage.addListener(message => {
     syncStore.updateSnackbar(msg)
   }
 })
+

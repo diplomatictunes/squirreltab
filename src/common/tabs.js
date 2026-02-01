@@ -1,21 +1,20 @@
 import storage from './storage'
 import {createNewTabList} from './list'
-import _ from 'lodash'
-import browser from 'webextension-polyfill'
 import listManager from './listManager'
 import {ILLEGAL_URLS} from './constants'
 
-const getAllInWindow = windowId => browser.tabs.query({windowId})
+
+const getAllInWindow = windowId => chrome.tabs.query({windowId})
 
 const APP_TAB_ID_KEY = 'appTabIds' // Define a key for storing app tab IDs in storage
 
 const openTabLists = async () => {
-  const currentWindow = await browser.windows.getCurrent()
+  const currentWindow = await chrome.windows.getCurrent()
   const windowId = currentWindow.id
-  const tabListsUrl = browser.runtime.getURL('index.html#/app/')
+  const tabListsUrl = chrome.runtime.getURL('index.html#/app/')
 
   // Retrieve stored appTabIds from local storage
-  const storedData = await browser.storage.local.get(APP_TAB_ID_KEY)
+  const storedData = await chrome.storage.local.get(APP_TAB_ID_KEY)
   const appTabIds = storedData[APP_TAB_ID_KEY] || {}
 
   if (windowId in appTabIds) {
@@ -23,27 +22,27 @@ const openTabLists = async () => {
     const tab = tabs.find(t => t.id === appTabIds[windowId])
     if (tab && tab.url.startsWith(tabListsUrl)) {
       // If the tab exists and is the correct URL, activate it
-      return browser.tabs.update(tab.id, { active: true })
+      return chrome.tabs.update(tab.id, { active: true })
     }
     // If tab doesn't exist or URL is wrong, remove it from tracking
     delete appTabIds[windowId]
-    await browser.storage.local.set({ [APP_TAB_ID_KEY]: appTabIds })
+    await chrome.storage.local.set({ [APP_TAB_ID_KEY]: appTabIds })
   }
 
   // Create a new tab and store its ID
-  const createdTab = await browser.tabs.create({ url: tabListsUrl })
+  const createdTab = await chrome.tabs.create({ url: tabListsUrl })
   appTabIds[windowId] = createdTab.id
-  await browser.storage.local.set({ [APP_TAB_ID_KEY]: appTabIds })
+  await chrome.storage.local.set({ [APP_TAB_ID_KEY]: appTabIds })
 }
 
 const openAboutPage = () => {
-  window.open(browser.runtime.getURL('index.html#/app/about'))
+  window.open(chrome.runtime.getURL('index.html#/app/about'))
 }
 
-const getSelectedTabs = () => browser.tabs.query({highlighted: true, currentWindow: true})
+const getSelectedTabs = () => chrome.tabs.query({highlighted: true, currentWindow: true})
 
 const getAllTabsInCurrentWindow = async () => {
-  const currentWindow = await browser.windows.getCurrent()
+  const currentWindow = await chrome.windows.getCurrent()
   return getAllInWindow(currentWindow.id)
 }
 
@@ -63,39 +62,34 @@ const groupTabsInCurrentWindow = async () => {
 }
 
 const isLegalURL = url => ILLEGAL_URLS.every(prefix => !url.startsWith(prefix))
-
 const storeTabs = async (tabs, listIndex) => {
-  const appUrl = browser.runtime.getURL('')
+  const appUrl = chrome.runtime.getURL('')
   tabs = tabs.filter(i => !i.url.startsWith(appUrl))
+
   const opts = await storage.getOptions()
   if (opts.ignorePinned) tabs = tabs.filter(i => !i.pinned)
   if (opts.excludeIllegalURL) tabs = tabs.filter(i => isLegalURL(i.url))
   if (tabs.length === 0) return
+
+  // 🔹 always start from persisted state
   const lists = await storage.getLists()
+
   if (listIndex == null) {
-    const newList = createNewTabList({tabs})
+    const newList = createNewTabList({ tabs })
     if (opts.pinNewList) newList.pinned = true
-    await listManager.addList(newList)
+    lists.unshift(newList)
   } else {
     const list = lists[listIndex]
     tabs.forEach(tab => list.tabs.push(tab))
-    await listManager.updateListById(list._id, _.pick(list, 'tabs'))
   }
-  if (opts.addHistory) {
-    for (let i = 0; i < tabs.length; i += 1) {
-      // maybe occur Error: "An unexpected error occurred" when trying to add about:* to history
-      try {
-        await browser.history.addUrl({url: tabs[i].url})
-      } catch (e) {
-        console.debug(`${tabs[i].url} cannot be added to history`)
-      }
-    }
-  }
-  return browser.tabs.remove(tabs.map(i => i.id))
-}
 
+  // 🔴 THIS is the critical line
+  await storage.setLists(lists)
+
+  return chrome.tabs.remove(tabs.map(i => i.id))
+}
 const storeCurrentTab = async listIndex => {
-  const tabs = await browser.tabs.query({active: true, currentWindow: true})
+  const tabs = await chrome.tabs.query({active: true, currentWindow: true})
   if (!tabs || tabs.length === 0) throw new Error('No active tab to stash')
   return storeTabs(tabs, listIndex)
 }
@@ -119,7 +113,7 @@ const storeAllTabs = async listIndex => {
 }
 
 const storeAllTabInAllWindows = async () => {
-  const windows = await browser.windows.getAll()
+  const windows = await chrome.windows.getAll()
   const opts = await storage.getOptions()
   if (opts.openTabListNoTab) await openTabLists()
   const tasks = []
@@ -140,22 +134,22 @@ const restoreTabs = async (tabs, windowId) => {
   }
   for (let i = 0; i < tabs.length; i += 1) {
     const tab = tabs[i]
-    const createdTab = await browser.tabs.create({
+    const createdTab = await chrome.tabs.create({
       url: tab.url,
       pinned: tab.pinned,
       index: i + indexOffset,
       windowId,
     })
-    if (tab.muted) browser.tabs.update(createdTab.id, {muted: true})
+    if (tab.muted) chrome.tabs.update(createdTab.id, {muted: true})
   }
 }
 
 const restoreList = (list, windowId) => restoreTabs(list.tabs, windowId)
 
 const restoreListInNewWindow = async list => {
-  const createdWindow = await browser.windows.create({url: list.tabs.map(i => i.url)})
+  const createdWindow = await chrome.windows.create({url: list.tabs.map(i => i.url)})
   list.tabs.forEach((tab, index) => {
-    if (tab.muted) browser.tabs.update(createdWindow.tabs[index].id, {muted: true})
+    if (tab.muted) chrome.tabs.update(createdWindow.tabs[index].id, {muted: true})
   })
 }
 

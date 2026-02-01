@@ -1,12 +1,36 @@
 <script>
   import { syncStore } from "../../store/syncStore.svelte.js";
   import { fade, fly, slide } from "svelte/transition";
+  import browser from "webextension-polyfill";
+  import TagInput from "../../component/tags/TagInput.svelte";
+  import { sendStashCurrentTabIntent } from "@/common/intents";
+  import { getRuntimeSource, isPopupContext } from "@/common/runtimeContext";
 
   let { activeView = "all" } = $props();
 
   let isReady = $derived(syncStore.initialized);
   let lists = $derived(syncStore.lists);
   let sortMode = $state("newest");
+  const runtimeSource = getRuntimeSource();
+  const popupContext = isPopupContext();
+
+  // Load saved sort preference
+  $effect(() => {
+    browser.storage.local.get("sortPreference").then((data) => {
+      if (data.sortPreference) {
+        sortMode = data.sortPreference;
+      }
+    });
+  });
+
+  // Save sort preference when changed
+  $effect(() => {
+    if (sortMode === "newest") {
+      browser.storage.local.remove("sortPreference");
+      return;
+    }
+    browser.storage.local.set({ sortPreference: sortMode });
+  });
   let filterQuery = $state("");
   let expandedLists = $state(new Set());
   let menuOpenFor = $state(null);
@@ -41,6 +65,27 @@
     const filtered = base.filter(matchFilter);
     const comparator = sortComparators[sortMode] || sortComparators.newest;
     return [...filtered].sort(comparator);
+  });
+
+  let totalBeforeFilter = $derived(() => {
+    if (activeView === "pinned") return syncStore.pinnedLists.length;
+    if (activeView.startsWith("tag:")) {
+      const tag = activeView.substring(4);
+      return (syncStore.taggedLists[tag] || []).length;
+    }
+    return lists.length;
+  });
+
+  let isFiltered = $derived(() => filterQuery.trim().length > 0);
+  let filteredOutCount = $derived(() => totalBeforeFilter - visibleLists.length);
+
+  // Extract all unique tags from all lists for autocomplete
+  let allKnownTags = $derived(() => {
+    const tagSet = new Set();
+    lists.forEach((list) => {
+      (list.tags || []).forEach((tag) => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
   });
 
   function toggleExpand(listId) {
@@ -91,7 +136,21 @@
     menuOpenFor = null;
     if (!list.pinned) {
       const confirmed = confirm(
-        "Restoring will reopen these tabs and remove the stash unless it is pinned. Continue?"
+        `\u26A0\uFE0F This stash is NOT pinned.\n\n` +
+          `Restoring will:\n` +
+          `\u2713 Reopen all ${list.tabs?.length || 0} tabs\n` +
+          `\u2717 Delete this stash permanently\n\n` +
+          `Tip: Pin the stash first if you want to keep it.\n\n` +
+          `Continue with restore?`
+      );
+      if (!confirmed) return;
+    } else {
+      const confirmed = confirm(
+        `\uD83D\uDCCC This stash is pinned.\n\n` +
+          `Restoring will:\n` +
+          `\u2713 Reopen all ${list.tabs?.length || 0} tabs\n` +
+          `\u2713 Keep this stash for future use\n\n` +
+          `Continue?`
       );
       if (!confirmed) return;
     }
@@ -130,13 +189,9 @@
     }
   }
 
-  function addTag(list) {
-    if (!list) return;
-    const nextTag = prompt("Add a tag to this stash");
-    if (!nextTag) return;
-    const trimmed = nextTag.trim();
-    if (!trimmed) return;
-    const tags = Array.from(new Set([...(list.tags || []), trimmed]));
+  function addTag(list, newTag) {
+    if (!list || !newTag) return;
+    const tags = Array.from(new Set([...(list.tags || []), newTag]));
     syncStore.updateList(list._id, { tags });
   }
 
@@ -146,16 +201,17 @@
     syncStore.updateList(list._id, { tags });
   }
 
-  async function stashCurrentTabFromEmpty() {
-    if (emptyStashLoading) return;
+  // Popup UI dispatches stash intent only; background performs all tab and storage work.
+  function stashCurrentTabFromEmpty() {
+    if (!popupContext || emptyStashLoading) return;
     emptyStashLoading = true;
-    try {
-      await syncStore.stashCurrentTab();
-    } catch (error) {
-      // snackbar already updated inside syncStore
-    } finally {
-      emptyStashLoading = false;
-    }
+    sendStashCurrentTabIntent(runtimeSource)
+      .catch((error) => {
+        console.error("[SquirrlTab] Failed to dispatch stash intent from popup:", error);
+      })
+      .finally(() => {
+        emptyStashLoading = false;
+      });
   }
 
   function getViewTitle() {
@@ -201,7 +257,7 @@
           No stashes with this tag yet. Add tags to organize your collection
         {/if}
       </p>
-      {#if activeView === "all"}
+      {#if activeView === "all" && popupContext}
         <button class="action-button" onclick={stashCurrentTabFromEmpty} disabled={emptyStashLoading}>
           <i class={`fas ${emptyStashLoading ? "fa-spinner fa-spin" : "fa-plus"}`}></i>
           <span>{emptyStashLoading ? "Stashing..." : "Stash Current Tab"}</span>
@@ -215,10 +271,15 @@
     <div class="view-header">
       <div class="view-title">
         <h1>{getViewTitle()}</h1>
-        <span class="stash-count"
-          >{visibleLists.length}
-          {visibleLists.length === 1 ? "stash" : "stashes"}</span
-        >
+        <span class="stash-count">
+          {visibleLists.length}
+          {visibleLists.length === 1 ? "stash" : "stashes"}
+          {#if isFiltered && filteredOutCount > 0}
+            <span class="filter-indicator">
+              ({filteredOutCount} hidden by filter)
+            </span>
+          {/if}
+        </span>
       </div>
 
       <div class="view-actions">
@@ -248,6 +309,19 @@
             </button>
           {/if}
         </div>
+        {#if isFiltered}
+          <button
+            class="clear-all-btn"
+            onclick={() => {
+              filterQuery = "";
+              sortMode = "newest";
+            }}
+            title="Reset sort and filter"
+          >
+            <i class="fas fa-redo"></i>
+            <span>Reset</span>
+          </button>
+        {/if}
       </div>
     </div>
 
@@ -261,6 +335,7 @@
           <!-- Card Header -->
           <div
             class="card-header"
+            class:pinned={list.pinned}
             role="button"
             tabindex="0"
             aria-expanded={expandedLists.has(list._id)}
@@ -309,7 +384,11 @@
                 class="card-btn pin"
                 class:pinned={list.pinned}
                 onclick={() => syncStore.pinList(list._id, !list.pinned)}
-                title={list.pinned ? "Unpin" : "Pin"}
+                title={
+                  list.pinned
+                    ? "Unpin (stash will be deleted when restored)"
+                    : "Pin (stash will be kept after restore)"
+                }
               >
                 <i class="fas fa-thumbtack"></i>
               </button>
@@ -341,6 +420,7 @@
                       <i class="fas fa-clone"></i>
                       Restore in new window
                     </button>
+                    <!-- AI Categorization - deferred to v2
                     <button
                       onclick={() => runAiCategorization(list)}
                       disabled={aiLoading === list._id}
@@ -349,6 +429,7 @@
                       <i class={`fas ${aiLoading === list._id ? "fa-spinner fa-spin" : "fa-magic"}`}></i>
                       {aiLoading === list._id ? "Categorizing..." : "AI Categorize"}
                     </button>
+                    -->
                     <button class="danger" onclick={() => handleDelete(list)}>
                       <i class="fas fa-trash"></i>
                       Delete stash
@@ -424,10 +505,13 @@
                 <span class="tag muted">No tags yet</span>
               {/if}
             </div>
-            <button class="add-tag-btn" onclick={() => addTag(list)}>
-              <i class="fas fa-plus"></i>
-              <span>Add tag</span>
-            </button>
+            
+            <TagInput
+              existingTags={list.tags || []}
+              allKnownTags={allKnownTags}
+              onAdd={(tag) => addTag(list, tag)}
+              placeholder="Add a tag..."
+            />
           </div>
 
           <!-- Quick Preview (when collapsed) -->
@@ -585,6 +669,13 @@
     font-weight: 500;
   }
 
+  .filter-indicator {
+    color: #ffc078;
+    font-weight: 500;
+    font-size: 0.8rem;
+    margin-left: 6px;
+  }
+
   .view-actions {
     display: flex;
     gap: 12px;
@@ -657,6 +748,26 @@
     color: #e4e4e7;
   }
 
+  .clear-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(255, 146, 43, 0.12);
+    border: 1px solid rgba(255, 146, 43, 0.3);
+    border-radius: 8px;
+    color: #ff922b;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .clear-all-btn:hover {
+    background: rgba(255, 146, 43, 0.2);
+    border-color: rgba(255, 146, 43, 0.5);
+  }
+
   /* Lists Grid */
   .lists-grid {
     display: grid;
@@ -687,6 +798,21 @@
     padding: 20px;
     background: linear-gradient(180deg, #1e1f23 0%, #1a1b1e 100%);
     border-bottom: 1px solid #2c2e33;
+    position: relative;
+  }
+
+  .card-header.pinned {
+    border-left: 3px solid #ff922b;
+    padding-left: 17px;
+  }
+
+  .card-header.pinned::before {
+    content: "\01F4CC";
+    position: absolute;
+    left: 8px;
+    top: 12px;
+    font-size: 1rem;
+    opacity: 0.6;
   }
 
   .expand-toggle {
@@ -968,24 +1094,6 @@
 
   .remove-tag:hover {
     color: #fa5252;
-  }
-
-  .add-tag-btn {
-    align-self: flex-start;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
-    background: rgba(255, 146, 43, 0.12);
-    border-radius: 999px;
-    color: #ff922b;
-    font-size: 0.8rem;
-    border: 1px solid rgba(255, 146, 43, 0.4);
-    transition: background 0.2s;
-  }
-
-  .add-tag-btn:hover {
-    background: rgba(255, 146, 43, 0.2);
   }
 
   /* Quick Preview */

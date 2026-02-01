@@ -3,6 +3,7 @@
   import Drawer from "./component/main/Drawer.svelte";
   import Toolbar from "./component/main/Toolbar.svelte";
   import DetailList from "./page/main/DetailList.svelte";
+  import SettingsView from "./page/settings/SettingsView.svelte";
   import Snackbar from "./component/main/Snackbar.svelte";
 
   let drawerOpen = $state(false);
@@ -15,12 +16,22 @@
 </script>
 
 <div class="app">
-  <Toolbar onToggleDrawer={() => (drawerOpen = !drawerOpen)} />
+  <Toolbar
+    onToggleDrawer={() => (drawerOpen = !drawerOpen)}
+    onOpenSettings={() => {
+      activeView = "options";
+      drawerOpen = false;
+    }}
+  />
 
   <Drawer bind:open={drawerOpen} onSetView={handleViewChange} />
 
   <main class="main-content">
-    <DetailList {activeView} />
+    {#if activeView === "options"}
+      <SettingsView onBack={() => (activeView = "all")} />
+    {:else}
+      <DetailList {activeView} />
+    {/if}
   </main>
 
   <Snackbar />

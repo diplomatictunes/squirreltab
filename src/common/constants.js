@@ -37,3 +37,9 @@ export const REMOVE_LIST_BY_ID = 'removeListById'
 export const CHANGE_LIST_ORDER = 'changeListOrderRelatively'
 
 export const SENTRY_DSN = 'https://3a924dd322e24dbca1c28364de767ffc@sentry.io/1307154'
+
+export const RUNTIME_MESSAGES = {
+  STASH_CURRENT_TAB: 'STASH_CURRENT_TAB',
+  STASH_COMPLETED: 'STASH_COMPLETED',
+  STASH_FAILED: 'STASH_FAILED',
+}

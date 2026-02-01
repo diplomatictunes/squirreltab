@@ -5,8 +5,62 @@ import {sendMessage} from '../common/utils'
 import listManager from '../common/listManager'
 import {setupContextMenus} from './contextMenus'
 import {updateBrowserAction} from './browserAction'
+import browser from 'webextension-polyfill'
+import {ILLEGAL_URLS, RUNTIME_MESSAGES} from '../common/constants'
+
+const getExtensionUrlPrefix = () => browser.runtime.getURL('')
+
+const isBlockedStashTarget = url => {
+  if (!url) return true
+  const extensionUrl = getExtensionUrlPrefix()
+  if (url.startsWith(extensionUrl)) return true
+  return ILLEGAL_URLS.some(prefix => url.startsWith(prefix))
+}
+
+const emitStashEvent = (type, payload) => {
+  return browser.runtime.sendMessage({
+    type,
+    payload,
+  }).catch(() => {
+    // It's fine if no UI is listening.
+  })
+}
+
+const handleStashCurrentTabIntent = async (source = 'app') => {
+  try {
+    const [activeTab] = await browser.tabs.query({active: true, currentWindow: true})
+    if (!activeTab || !activeTab.id) {
+      throw new Error('NO_ACTIVE_TAB')
+    }
+    if (isBlockedStashTarget(activeTab.url)) {
+      throw new Error('BLOCKED_URL')
+    }
+    await tabs.storeCurrentTab()
+    await emitStashEvent(RUNTIME_MESSAGES.STASH_COMPLETED, {
+      source,
+      tabId: activeTab.id,
+      title: activeTab.title,
+      url: activeTab.url,
+    })
+  } catch (error) {
+    await emitStashEvent(RUNTIME_MESSAGES.STASH_FAILED, {
+      source,
+      reason: error.message || 'UNKNOWN',
+    })
+    console.error('[SquirrlTab] Failed to stash current tab intent:', error)
+  }
+}
 
 const messageHandler = async msg => {
+  if (!msg) return
+  if (msg.type === RUNTIME_MESSAGES.STASH_COMPLETED || msg.type === RUNTIME_MESSAGES.STASH_FAILED) {
+    return
+  }
+  if (msg.type === RUNTIME_MESSAGES.STASH_CURRENT_TAB) {
+    const source = msg.payload?.source || 'app'
+    handleStashCurrentTabIntent(source)
+    return
+  }
   console.debug('received', msg)
   if (msg.optionsChanged) {
     const changes = msg.optionsChanged

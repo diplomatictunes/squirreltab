@@ -1,8 +1,9 @@
 <script>
   import { syncStore } from "../../store/syncStore.svelte.js";
-  import __ from "@/common/i18n";
   import { fade, fly } from "svelte/transition";
   import { SYNC_PHASES } from "@/common/constants";
+  import { sendStashCurrentTabIntent } from "@/common/intents";
+  import { getRuntimeSource, isPopupContext } from "@/common/runtimeContext";
 
   let { open = $bindable(false), onSetView } = $props();
 
@@ -14,6 +15,8 @@
   let taggedLists = $derived(syncStore.taggedLists);
   let syncMeta = $derived(syncStore.syncStatus);
   let stashLoading = $state(false);
+  const runtimeSource = getRuntimeSource();
+  const popupContext = isPopupContext();
 
   const formatSyncedTime = (timestamp) => {
     if (!timestamp) return "";
@@ -31,16 +34,17 @@
     return "Idle";
   });
 
-  const handleQuickStash = async () => {
-    if (stashLoading) return;
+  // Popup UI must never perform async tab, storage, or sync work; delegate via runtime messaging only.
+  const handleQuickStash = () => {
+    if (!popupContext || stashLoading) return;
     stashLoading = true;
-    try {
-      await syncStore.stashCurrentTab();
-    } catch (error) {
-      // snackbar already handled in store
-    } finally {
-      stashLoading = false;
-    }
+    sendStashCurrentTabIntent(runtimeSource)
+      .catch((error) => {
+        console.error("[SquirrlTab] Failed to dispatch stash intent from popup:", error);
+      })
+      .finally(() => {
+        stashLoading = false;
+      });
   };
 </script>
 
@@ -66,13 +70,15 @@
       </div>
     </header>
 
-    <!-- Quick Actions -->
-    <section class="quick-actions">
-      <button class="action-btn primary" onclick={handleQuickStash} disabled={stashLoading}>
-        <i class={`fas ${stashLoading ? "fa-spinner fa-spin" : "fa-plus"}`}></i>
-        <span>{stashLoading ? "Stashing..." : "Stash This Tab"}</span>
-      </button>
-    </section>
+    {#if popupContext}
+      <!-- Quick Actions -->
+      <section class="quick-actions">
+        <button class="action-btn primary" onclick={handleQuickStash} disabled={stashLoading}>
+          <i class={`fas ${stashLoading ? "fa-spinner fa-spin" : "fa-plus"}`}></i>
+          <span>{stashLoading ? "Stashing..." : "Stash This Tab"}</span>
+        </button>
+      </section>
+    {/if}
 
     <!-- Navigation -->
     <nav class="nav-section">

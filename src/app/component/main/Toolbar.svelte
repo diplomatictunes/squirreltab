@@ -1,24 +1,7 @@
 <script>
-  import { syncStore } from "../../store/syncStore.svelte.js";
-  import browser from "webextension-polyfill";
   import SyncStatusBadge from "../sync/SyncStatusBadge.svelte";
 
-  let { onToggleDrawer } = $props();
-
-  let nightmode = $derived(syncStore.opts.nightmode || false);
-  let searchQuery = $state("");
-
-  function toggleNightMode() {
-    browser.storage.local.get("opts").then((data) => {
-      const opts = data.opts || {};
-      opts.nightmode = !nightmode;
-      browser.storage.local.set({ opts });
-    });
-  }
-
-  function handleSearch(event) {
-    searchQuery = event.target.value;
-  }
+  let { onToggleDrawer, onOpenSettings } = $props();
 </script>
 
 <nav class="toolbar">
@@ -33,42 +16,12 @@
     </div>
   </div>
 
-  <div class="toolbar-center">
-    <div class="search-container">
-      <i class="fas fa-search search-icon"></i>
-      <input
-        type="text"
-        placeholder="Search your hoard..."
-        value={searchQuery}
-        oninput={handleSearch}
-        class="search-input"
-      />
-      {#if searchQuery}
-        <button
-          class="clear-search"
-          onclick={() => (searchQuery = "")}
-          aria-label="Clear search"
-        >
-          <i class="fas fa-times"></i>
-        </button>
-      {/if}
-    </div>
-  </div>
-
   <div class="toolbar-right">
-    <button
-      class="icon-btn"
-      onclick={toggleNightMode}
-      title={nightmode ? "Light mode" : "Dark mode"}
-    >
-      <i class="fas fa-{nightmode ? 'sun' : 'moon'}"></i>
-    </button>
-
     <div class="sync-wrapper">
       <SyncStatusBadge />
     </div>
 
-    <button class="icon-btn" title="Settings">
+    <button class="icon-btn" onclick={onOpenSettings} title="Settings">
       <i class="fas fa-cog"></i>
     </button>
 
@@ -98,9 +51,8 @@
     gap: 12px;
   }
 
-  .toolbar-center {
+  .toolbar-left {
     flex: 1;
-    max-width: 500px;
   }
 
   /* Menu Button */
@@ -144,62 +96,6 @@
     font-weight: 700;
     color: #e4e4e7;
     letter-spacing: -0.02em;
-  }
-
-  /* Search */
-  .search-container {
-    position: relative;
-    display: flex;
-    align-items: center;
-    background: #25262b;
-    border: 1px solid #2c2e33;
-    border-radius: 10px;
-    padding: 0 12px;
-    transition: all 0.2s;
-  }
-
-  .search-container:focus-within {
-    background: #2c2e33;
-    border-color: #3c3e44;
-    box-shadow: 0 0 0 3px rgba(255, 146, 43, 0.1);
-  }
-
-  .search-icon {
-    color: #5c5f66;
-    font-size: 0.875rem;
-    margin-right: 8px;
-  }
-
-  .search-input {
-    flex: 1;
-    background: transparent;
-    border: none;
-    color: #e4e4e7;
-    font-size: 0.875rem;
-    padding: 10px 0;
-    outline: none;
-  }
-
-  .search-input::placeholder {
-    color: #5c5f66;
-  }
-
-  .clear-search {
-    background: transparent;
-    border: none;
-    color: #5c5f66;
-    cursor: pointer;
-    padding: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    transition: all 0.2s;
-  }
-
-  .clear-search:hover {
-    background: #3c3e44;
-    color: #909296;
   }
 
   /* Icon Buttons */
@@ -248,8 +144,5 @@
       display: none;
     }
 
-    .toolbar-center {
-      max-width: 300px;
-    }
   }
 </style>

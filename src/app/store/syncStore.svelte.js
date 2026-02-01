@@ -2,7 +2,7 @@ import browser from 'webextension-polyfill'
 import CustomSync, { SyncError } from '@/common/service/custom-sync'
 import storage from '@/common/storage'
 import { createNewTabList } from '@/common/list'
-import { SYNC_PHASES } from '@/common/constants'
+import { SYNC_PHASES, RUNTIME_MESSAGES } from '@/common/constants'
 import { logSyncEvent } from '@/common/sync-logger'
 import tabsHelper from '@/common/tabs'
 import manager from './bridge'
@@ -415,15 +415,18 @@ export const syncStore = {
       manager.removeListById(id)
     }
   },
-  async stashCurrentTab() {
-    try {
-      await tabsHelper.storeCurrentTab()
-      this.updateSnackbar('Current tab stashed')
-      return true
-    } catch (error) {
-      console.error('[SquirrlTab] Failed to stash current tab:', error)
-      this.updateSnackbar('Unable to stash current tab')
-      throw error
-    }
-  },
 }
+
+browser.runtime.onMessage.addListener(message => {
+  if (!message || !message.type) return
+  if (message.type === RUNTIME_MESSAGES.STASH_COMPLETED) {
+    syncStore.updateSnackbar('Current tab stashed')
+  }
+  if (message.type === RUNTIME_MESSAGES.STASH_FAILED) {
+    const reason = message.payload?.reason
+    const msg = reason === 'BLOCKED_URL'
+      ? 'Cannot stash the IceTab app itself'
+      : 'Unable to stash current tab'
+    syncStore.updateSnackbar(msg)
+  }
+})

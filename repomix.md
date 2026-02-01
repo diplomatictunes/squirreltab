@@ -42,10 +42,10 @@ The content is organized as follows:
 .github/ISSUE_TEMPLATE/feature_request.md
 .github/workflows/build-on-push.yml
 .gitignore
+AGENTS.md
 bkp/favicomatic.zip
 bkp/IceTab_banner2-ChromeWebStore.png
 bkp/key.txt
-build_errors.txt
 CHANGELOG.md
 config.js
 CREDITS.md
@@ -55,6 +55,7 @@ IceTab_banner.png
 LICENSE
 package.json
 README.md
+scripts/validate-build.sh
 server/database.py
 server/docker-compose.yml
 server/Dockerfile
@@ -68,19 +69,23 @@ src/_locales/de/messages.json
 src/_locales/en/messages.json
 src/_locales/zh_CN/messages.json
 src/app/App.svelte
-src/app/component/main/detailList/ContextMenu.vue
 src/app/component/main/Drawer.svelte
 src/app/component/main/Snackbar.svelte
 src/app/component/main/Toolbar.svelte
+src/app/component/sync/SyncStatusBadge.svelte
+src/app/component/tags/TagInput.svelte
+src/app/index.css
 src/app/index.html
 src/app/index.js
 src/app/page/main/DetailList.svelte
+src/app/page/settings/SettingsView.svelte
 src/app/router/index.js
 src/app/store/bridge.js
 src/app/store/index.js
 src/app/store/lists.js
-src/app/store/syncStore.js
+src/app/store/syncStore.svelte.js
 src/assets/css/fontawesome-all.min.css
+src/assets/css/index.css
 src/assets/icons/icetab_old_favicon.svg
 src/assets/icons/icon128.png
 src/assets/icons/icon16.png
@@ -118,16 +123,19 @@ src/common/constants.js
 src/common/exchange.js
 src/common/helper.js
 src/common/i18n.js
+src/common/intents.js
 src/common/list.js
 src/common/listManager.d.ts
 src/common/listManager.js
 src/common/logger.svelte.js
 src/common/migrate.js
 src/common/options.js
+src/common/runtimeContext.js
 src/common/service/boss.js
 src/common/service/custom-sync.js
 src/common/service/gdrive.js
 src/common/storage.js
+src/common/sync-logger.js
 src/common/tab.js
 src/common/tabs.js
 src/common/tracker.js
@@ -137,1072 +145,120 @@ src/exchanger.js
 src/gdrive_sandbox.html
 src/gdrive_sandbox.js
 src/manifest.json
+src/mock/index.js
 vue.config.js
 webpack.common.js
 webpack.dev.js
 webpack.prod.js
+webpack.serve.js
 ```
 
 # Files
 
-## File: build_errors.txt
-````
-node.exe : `isModuleDeclaration` has been deprecated, please 
-migrate to `isImportOrExportDeclaration`
-At line:1 char:1
-+ & "C:\Program Files\nodejs/node.exe" "C:\Program 
-Files\nodejs/node_mo ...
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-~~~~~~
-    + CategoryInfo          : NotSpecified: (`isModuleDeclar...o 
-   rtDeclaration`:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
-    at isModuleDeclaration (C:\Users\sg8\New folder\icetab\node_m
-odules\@babel\types\lib\validators\generated\index.js:2793:35)
-    at PluginPass.Program (C:\Users\sg8\New folder\icetab\node_mo
-dules\babel-plugin-lodash\lib\index.js:102:44)
-assets by status 950 KiB [1m[32m[cached][39m[22m 22 assets
-Entrypoint [1mapp[39m[22m = [1m[32mvendors.js[39m[22m [1m[32mapp.js[39m[22m 2 auxiliary assets
-Entrypoint [1mbackground[39m[22m = [1m[32mbackground.js[39m[22m 1 auxiliary asset
-Entrypoint [1mcontent[39m[22m = [1m[32mcontent.js[39m[22m 1 auxiliary asset
-Entrypoint [1mgdrive_sandbox[39m[22m = [1m[32mgdrive_sandbox.js[39m[22m 1 auxiliary asset
-orphan modules 1.75 MiB [1m[33m[orphan][39m[22m 879 modules
-runtime modules 5.21 KiB 16 modules
-cacheable modules 643 KiB
-  modules by path [1m./node_modules/lodash/*.js[39m[22m 157 KiB
-    [1m./node_modules/lodash/debounce.js[39m[22m 5.96 KiB [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
-    + 203 modules
-  modules by path [1m./node_modules/date-fns/esm/[39m[22m 125 KiB 27 modules
-  modules by path [1m./src/[39m[22m 196 KiB
-    modules by path [1m./src/*.js[39m[22m 39.8 KiB 2 modules
-    [1m./src/app/index.js + 18 modules[39m[22m 81.1 KiB [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m [1m[33m[5 warnings][39m[22m
-    [1m./src/background/index.js + 39 modules[39m[22m 75.4 KiB [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
-  [1m./node_modules/regenerator-runtime/runtime.js[39m[22m 24.7 KiB [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
-  [1m./node_modules/svelte/src/runtime/index.js + 18 modules[39m[22m 102 KiB [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
-  [1m./node_modules/webextension-polyfill/dist/browser-polyfill.js[39m[22m 37.5 KiB [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
-  [1m./node_modules/@babel/runtime/helpers/esm/typeof.js[39m[22m 366 bytes [1m[33m[built][39m[22m [1m[33m[code generated][39m[22m
-
-[1m[33mWARNING[39m[22m in [1m./src/app/component/main/Drawer.svelte[39m[22m
-[1mModule Warning (from ./node_modules/svelte-loader/index.js):
-A11y: <div> with click handler [1m[33mmust[39m[22m[1m have an ARIA role (17:2)
-15: 
-16: {#if open}
-17:   <div class="overlay" on:click={() => (open = false)} transition:fade></div>
-      ^
-18:   <aside class="drawer" transition:fly={{ x: -300, duration: 300 }}>
-19:     <nav>
-[39m[22m
- @ ./src/app/App.svelte 33:0-52 125:14-20
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[33mWARNING[39m[22m in [1m./src/app/component/main/Drawer.svelte[39m[22m
-[1mModule Warning (from ./node_modules/svelte-loader/index.js):
-A11y: visible, non-interactive elements with an on:click event [1m[33mmust[39m[22m[1m be accompanied by a keyboard event handler. Consider whether an interactive element such as <button type="button"> or <a> might be more appropriate. See https://svelte.dev/docs/accessibility-warnings#a11y-click-events-have-key-events for more details. (17:2)
-15: 
-16: {#if open}
-17:   <div class="overlay" on:click={() => (open = false)} transition:fade></div>
-      ^
-18:   <aside class="drawer" transition:fly={{ x: -300, duration: 300 }}>
-19:     <nav>
-[39m[22m
- @ ./src/app/App.svelte 33:0-52 125:14-20
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[33mWARNING[39m[22m in [1m./src/app/page/main/DetailList.svelte[39m[22m
-[1mModule Warning (from ./node_modules/svelte-loader/index.js):
-A11y: <div> with click handler [1m[33mmust[39m[22m[1m have an ARIA role (58:8)
-56:         animate:flip={{ duration: 300 }}
-57:       >
-58:         <div class="card-header" on:click={() => toggleExpand(list._id)}>
-            ^
-59:           <div class="header-main">
-60:             <span
-[39m[22m
- @ ./src/app/App.svelte 30:0-55 39:18-28
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[33mWARNING[39m[22m in [1m./src/app/page/main/DetailList.svelte[39m[22m
-[1mModule Warning (from ./node_modules/svelte-loader/index.js):
-A11y: visible, non-interactive elements with an on:click event [1m[33mmust[39m[22m[1m be accompanied by a keyboard event handler. Consider whether an interactive element such as <button type="button"> or <a> might be more appropriate. See https://svelte.dev/docs/accessibility-warnings#a11y-click-events-have-key-events for more details. (58:8)
-56:         animate:flip={{ duration: 300 }}
-57:       >
-58:         <div class="card-header" on:click={() => toggleExpand(list._id)}>
-            ^
-59:           <div class="header-main">
-60:             <span
-[39m[22m
- @ ./src/app/App.svelte 30:0-55 39:18-28
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[33mWARNING[39m[22m in [1m./src/app/page/main/DetailList.svelte[39m[22m
-[1mModule Warning (from ./node_modules/svelte-loader/index.js):
-DetailList has unused export property 'title'. If it is for external reference only, please consider using `export const title` (3:13)
-1: <script>
-2:   export let lists = [];
-3:   export let title = "Tab Lists";
-                ^
-4: 
-5:   import { actions, aiLoading, opts } from "../../store/syncStore";
-[39m[22m
- @ ./src/app/App.svelte 30:0-55 39:18-28
- @ ./src/app/index.js 2:0-31 12:18-21
-
-5 warnings have detailed information that is not shown.
-Use 'stats.errorDetails: true' resp. '--stats-error-details' to show it.
-
-[1m[31mERROR[39m[22m in [1m./src/app/store/syncStore.js[39m[22m [1m[32m2:0-54[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/store' in 'C:\Users\sg8\New folder\icetab\src\app\store'[39m[22m
- @ ./src/app/App.svelte 29:0-74 242:29-34 243:29-40 244:29-40 245:29-33
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/App.svelte[39m[22m [1m[32m2:0-25:25[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/internal' in 'C:\Users\sg8\New folder\icetab\src\app'[39m[22m
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/App.svelte[39m[22m [1m[32m27:0-42[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/internal/disclose-version' in 'C:\Users\sg8\New folder\icetab\src\app'[39m[22m
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/component/main/Drawer.svelte[39m[22m [1m[32m2:0-26:25[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/internal' in 'C:\Users\sg8\New folder\icetab\src\app\component\main'[39m[22m
- @ ./src/app/App.svelte 33:0-52 125:14-20
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/component/main/Drawer.svelte[39m[22m [1m[32m28:0-42[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/internal/disclose-version' in 'C:\Users\sg8\New folder\icetab\src\app\component\main'[39m[22m
- @ ./src/app/App.svelte 33:0-52 125:14-20
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/component/main/Drawer.svelte[39m[22m [1m[32m32:0-46[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/transition' in 'C:\Users\sg8\New folder\icetab\src\app\component\main'[39m[22m
- @ ./src/app/App.svelte 33:0-52 125:14-20
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/component/main/Snackbar.svelte[39m[22m [1m[32m2:0-21:25[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/internal' in 'C:\Users\sg8\New folder\icetab\src\app\component\main'[39m[22m
- @ ./src/app/App.svelte 31:0-56 138:16-24
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/component/main/Snackbar.svelte[39m[22m [1m[32m23:0-42[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/internal/disclose-version' in 'C:\Users\sg8\New folder\icetab\src\app\component\main'[39m[22m
- @ ./src/app/App.svelte 31:0-56 138:16-24
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/component/main/Snackbar.svelte[39m[22m [1m[32m25:0-41[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/transition' in 'C:\Users\sg8\New folder\icetab\src\app\component\main'[39m[22m
- @ ./src/app/App.svelte 31:0-56 138:16-24
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/component/main/Toolbar.svelte[39m[22m [1m[32m2:0-17:25[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/internal' in 'C:\Users\sg8\New folder\icetab\src\app\component\main'[39m[22m
- @ ./src/app/App.svelte 32:0-54 112:15-22
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/component/main/Toolbar.svelte[39m[22m [1m[32m19:0-42[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/internal/disclose-version' in 'C:\Users\sg8\New folder\icetab\src\app\component\main'[39m[22m
- @ ./src/app/App.svelte 32:0-54 112:15-22
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/page/main/DetailList.svelte[39m[22m [1m[32m2:0-35:25[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/internal' in 'C:\Users\sg8\New folder\icetab\src\app\page\main'[39m[22m
- @ ./src/app/App.svelte 30:0-55 39:18-28
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/page/main/DetailList.svelte[39m[22m [1m[32m37:0-42[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/internal/disclose-version' in 'C:\Users\sg8\New folder\icetab\src\app\page\main'[39m[22m
- @ ./src/app/App.svelte 30:0-55 39:18-28
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/page/main/DetailList.svelte[39m[22m [1m[32m41:0-38[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/animate' in 'C:\Users\sg8\New folder\icetab\src\app\page\main'[39m[22m
- @ ./src/app/App.svelte 30:0-55 39:18-28
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[31mERROR[39m[22m in [1m./src/app/page/main/DetailList.svelte[39m[22m [1m[32m42:0-41[39m[22m
-[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'svelte/transition' in 'C:\Users\sg8\New folder\icetab\src\app\page\main'[39m[22m
- @ ./src/app/App.svelte 30:0-55 39:18-28
- @ ./src/app/index.js 2:0-31 12:18-21
-
-[1m[33m15 errors have detailed information that is not shown.
-Use 'stats.errorDetails: true' resp. '--stats-error-details' to show it.[39m[22m
-
-webpack 5.104.1 compiled with [1m[31m15 errors[39m[22m and [1m[33m5 warnings[39m[22m in 11081 ms
-````
-
-## File: server/database.py
-````python
-import datetime
-import json
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
-
-SQLALCHEMY_DATABASE_URL = "sqlite:///./icetab.db"
-
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
-
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    api_key = Column(String, unique=True, index=True)
-    
-    tab_lists = relationship("TabList", back_populates="user")
-
-class TabList(Base):
-    __tablename__ = "tab_lists"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    remote_id = Column(String, index=True) # Extension's ID
-    title = Column(String)
-    tabs = Column(String)  # JSON string
-    category = Column(String)
-    tags = Column(String)  # JSON string
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-
-    user = relationship("User", back_populates="tab_lists")
-
-def init_db():
-    Base.metadata.create_all(bind=engine)
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-````
-
-## File: server/docker-compose.yml
-````yaml
-version: '3.8'
-
-services:
-  server:
-    build: .
-    ports:
-      - "8000:8000"
-    volumes:
-      - .:/app
-      - db_data:/app/data
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-    restart: always
-
-volumes:
-  db_data:
-````
-
-## File: server/Dockerfile
-````
-FROM python:3.11-slim
-
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-EXPOSE 8000
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-````
-
-## File: server/main.py
-````python
-import os
-import datetime
-from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, Security, Request
-from fastapi.security.api_key import APIKeyHeader
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
-import json
-from openai import OpenAI
-from dotenv import load_dotenv
-
-from database import init_db, get_db, User, TabList
-
-load_dotenv()
-
-app = FastAPI(title="IceTab Sync API")
-
-from fastapi.middleware.cors import CORSMiddleware
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
-)
-
-# Security
-API_KEY_NAME = "x-api-key"
-api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=True)
-
-# OpenAI Client (Optional for non-AI features)
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
-
-# Models
-class TabItem(BaseModel):
-    title: str
-    url: str
-
-class TabListSchema(BaseModel):
-    remote_id: str
-    title: str
-    tabs: List[TabItem]
-    category: Optional[str] = None
-    tags: Optional[List[str]] = []
-
-class CategorizeRequest(BaseModel):
-    tabs: List[TabItem]
-
-# Auth Dependency
-def get_user_by_api_key(api_key: str = Security(api_key_header), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.api_key == api_key).first()
-    if not user:
-        raise HTTPException(status_code=403, detail="Could not validate credentials")
-    return user
-
-@app.on_event("startup")
-def startup_event():
-    init_db()
-
-@app.get("/health")
-def health_check():
-    return {
-        "status": "ok",
-        "time": datetime.datetime.utcnow().isoformat()
+## File: src/app/component/tags/TagInput.svelte
+````svelte
+<script>
+  let { 
+    existingTags = [], 
+    allKnownTags = [], 
+    onAdd,
+    placeholder = "Add a tag..."
+  } = $props();
+  
+  let inputValue = $state("");
+  let showSuggestions = $state(false);
+  let focusedIndex = $state(-1);
+  
+  // Filter suggestions based on input
+  let suggestions = $derived(() => {
+    if (!inputValue.trim()) return [];
+    const needle = inputValue.toLowerCase();
+    return allKnownTags
+      .filter(tag => 
+        tag.toLowerCase().includes(needle) && 
+        !existingTags.includes(tag)
+      )
+      .slice(0, 5);
+  });
+  
+  function handleKeyDown(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      if (focusedIndex >= 0 && suggestions.length > 0) {
+        addTag(suggestions[focusedIndex]);
+      } else if (inputValue.trim()) {
+        addTag(inputValue.trim());
+      }
+    } else if (event.key === 'Escape') {
+      showSuggestions = false;
+      inputValue = "";
+    } else if (event.key === 'ArrowDown' && suggestions.length > 0) {
+      event.preventDefault();
+      focusedIndex = Math.min(focusedIndex + 1, suggestions.length - 1);
+    } else if (event.key === 'ArrowUp' && suggestions.length > 0) {
+      event.preventDefault();
+      focusedIndex = Math.max(focusedIndex - 1, -1);
     }
-
-@app.post("/sync/push")
-def push_tabs(data: TabListSchema, user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
-    # Check if remote_id already exists for this user
-    existing = db.query(TabList).filter(
-        TabList.user_id == user.id, 
-        TabList.remote_id == data.remote_id
-    ).first()
+  }
+  
+  function addTag(tag) {
+    const trimmed = tag.trim();
+    if (!trimmed || existingTags.includes(trimmed)) return;
     
-    if existing:
-        existing.title = data.title
-        existing.tabs = json.dumps([t.dict() for t in data.tabs])
-        existing.category = data.category
-        existing.tags = json.dumps(data.tags)
-        existing.updated_at = datetime.datetime.utcnow()
-    else:
-        new_list = TabList(
-            user_id=user.id,
-            remote_id=data.remote_id,
-            title=data.title,
-            tabs=json.dumps([t.dict() for t in data.tabs]),
-            category=data.category,
-            tags=json.dumps(data.tags)
-        )
-        db.add(new_list)
-    
-    db.commit()
-    return {"status": "success"}
-
-@app.get("/sync/pull")
-def pull_tabs(user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
-    lists = db.query(TabList).filter(TabList.user_id == user.id).all()
-    result = []
-    for l in lists:
-        result.append({
-            "id": l.id,
-            "remote_id": l.remote_id,
-            "title": l.title,
-            "tabs": json.loads(l.tabs),
-            "category": l.category,
-            "tags": json.loads(l.tags) if l.tags else [],
-            "updated_at": l.updated_at.isoformat()
-        })
-    return result
-
-@app.post("/ai/categorize")
-def categorize_tabs(data: CategorizeRequest, user: User = Depends(get_user_by_api_key)):
-    if not os.getenv("OPENAI_API_KEY"):
-        raise HTTPException(status_code=500, detail="OpenAI API Key not configured")
-
-    prompt = f"""
-    Categorize these navigation tabs into one high-level category (e.g., Shopping, Dev, Research, Entertainment, Social).
-    Also provide a few descriptive tags.
-    Identify duplicate URLs (ignoring UTM parameters).
-    
-    Tabs:
-    {json.dumps([t.dict() for t in data.tabs], indent=2)}
-    
-    Return ONLY JSON in this format:
-    {{
-        "category": "category name",
-        "tags": ["tag1", "tag2"],
-        "duplicate_ids": [indices of duplicate tabs]
-    }}
-    """
-    
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant that categorizes browser tabs."},
-                {"role": "user", "content": prompt}
-            ],
-            response_format={ "type": "json_object" }
-        )
-        
-        result = json.loads(response.choices[0].message.content)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-````
-
-## File: server/README.md
-````markdown
-# IceTab Backend Server
-
-A lightweight FastAPI backend for tab synchronization and AI-powered categorization.
-
-## Features
-- **Sync**: Persistent tab lists stored in SQLite.
-- **AI Categorization**: Simple API to categorize tabs and find duplicates using OpenAI.
-- **Docker Ready**: Includes `Dockerfile` and `docker-compose.yml`.
-
-## Quick Start (Local)
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Set your environment variables (create a `.env` file):
-   ```env
-   OPENAI_API_KEY=your_key_here
-   ```
-3. Run the server:
-   ```bash
-   python main.py
-   ```
-   The server will be available at `http://localhost:8000`.
-
-## Quick Start (Docker)
-1. Set your `OPENAI_API_KEY` in `.env`.
-2. Run:
-   ```bash
-   docker-compose up -d
-   ```
-
-## Development Contract
-For details on the API endpoints and request/response formats, please see the [API Contract](../.gemini/antigravity/brain/39ddb5b8-89ab-4527-b899-f5eeda2f25e8/api_contract.md) (or refer to the `api_contract.md` in your artifacts).
-````
-
-## File: server/requirements.txt
-````
-fastapi
-uvicorn
-sqlalchemy
-openai
-pydantic-settings
-python-dotenv
-httpx
-````
-
-## File: server/seed_db.py
-````python
-from database import SessionLocal, User
-
-def seed():
-    db = SessionLocal()
-    # Check if test key already exists
-    exists = db.query(User).filter(User.api_key == "test-key-123").first()
-    if not exists:
-        test_user = User(api_key="test-key-123")
-        db.add(test_user)
-        db.commit()
-        print("Success: Created test user with API key: test-key-123")
-    else:
-        print("Test user already exists.")
-    db.close()
-
-if __name__ == "__main__":
-    seed()
-````
-
-## File: server/test_health.py
-````python
-import httpx
-import json
-
-BASE_URL = "http://localhost:8000"
-
-def test_health():
-    print("Testing Health Check...")
-    try:
-        response = httpx.get(f"{BASE_URL}/health")
-        print(f"Status: {response.status_code}")
-        print(f"Body: {response.json()}")
-    except Exception as e:
-        print(f"Error: {e}")
-
-if __name__ == "__main__":
-    test_health()
-````
-
-## File: src/app/App.svelte
-````svelte
-<script>
-  import { onMount } from "svelte";
-  import { lists, pinnedLists, taggedLists, opts } from "./store/syncStore";
-  import DetailList from "./page/main/DetailList.svelte";
-  import Snackbar from "./component/main/Snackbar.svelte";
-  import Toolbar from "./component/main/Toolbar.svelte";
-  import Drawer from "./component/main/Drawer.svelte";
-  import { logger } from "../common/logger.svelte.js";
-
-  let drawerOpen = $state(false);
-  let currentView = $state("all");
-
-  onMount(() => {
-    // Check for popup context and add the class to the html/body
-    if (
-      new URLSearchParams(window.location.search).get("context") === "popup" ||
-      window.location.pathname.endsWith("popup.html")
-    ) {
-      document.documentElement.classList.add("icetab-popup");
-    }
-  });
-
-  let activeLists = $derived.by(() => {
-    if (currentView === "pinned") return $pinnedLists;
-    if (currentView.startsWith("tag:")) {
-      const tag = currentView.split(":")[1];
-      return $taggedLists[tag] || [];
-    }
-    return $lists;
-  });
-
-  let viewTitle = $derived.by(() => {
-    if (currentView === "pinned") return "Pinned Lists";
-    if (currentView.startsWith("tag:"))
-      return `Tag: ${currentView.split(":")[1]}`;
-    return "All Tab Lists";
-  });
+    if (onAdd) onAdd(trimmed);
+    inputValue = "";
+    showSuggestions = false;
+    focusedIndex = -1;
+  }
+  
+  function handleInput() {
+    showSuggestions = inputValue.trim().length > 0;
+    focusedIndex = -1;
+  }
+  
+  function handleBlur() {
+    // Delay to allow click on suggestion
+    setTimeout(() => {
+      showSuggestions = false;
+      focusedIndex = -1;
+    }, 200);
+  }
 </script>
 
-<div class="app" class:dark={$opts.nightmode}>
-  <Toolbar onToggleDrawer={() => (drawerOpen = !drawerOpen)} />
-  <Drawer bind:open={drawerOpen} onSetView={(view) => (currentView = view)} />
-
-  <main>
-    {#if currentView === "options"}
-      <div class="options-page">
-        <h2>Options</h2>
-        <div class="debug-panel">
-          <h3>Debug Logs ({logger.entries.length})</h3>
-          <div class="controls">
-            <button
-              onclick={() => {
-                const text = JSON.stringify(logger.entries, null, 2);
-                navigator.clipboard.writeText(text);
-                alert("Logs copied to clipboard");
-              }}>Copy Logs for Support</button
-            >
-            <button onclick={() => logger.clear()}>Clear</button>
-          </div>
-          <pre>{JSON.stringify(logger.entries.slice().reverse(), null, 2)}</pre>
-        </div>
-      </div>
-    {:else}
-      <DetailList lists={activeLists} title={viewTitle} />
-    {/if}
-  </main>
-
-  <Snackbar />
-</div>
-
-<style>
-  :global(body) {
-    margin: 0;
-    font-family:
-      "Inter",
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      Roboto,
-      sans-serif;
-    background: #f9fafb;
-    color: #111827;
-  }
-
-  .app {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
-
-  .app.dark {
-    background: #111827;
-    color: #f9fafb;
-  }
-
-  main {
-    flex: 1;
-    padding-top: 20px;
-  }
-
-  :global(.icetab-popup) {
-    width: 600px;
-    height: 600px;
-  }
-
-  .options-page {
-    padding: 20px;
-  }
-  .debug-panel pre {
-    background: #e2e8f0;
-    padding: 10px;
-    max-height: 400px;
-    overflow: auto;
-    border-radius: 4px;
-    font-size: 12px;
-    white-space: pre-wrap;
-  }
-  .app.dark .debug-panel pre {
-    background: #1f2937;
-    color: #e5e7eb;
-  }
-  .debug-panel .controls {
-    margin-bottom: 10px;
-  }
-  .debug-panel button {
-    margin-right: 10px;
-    padding: 6px 12px;
-    background: #06b6d4;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  .debug-panel button:hover {
-    background: #0891b2;
-  }
-</style>
-````
-
-## File: src/app/component/main/Drawer.svelte
-````svelte
-<script>
-  import { taggedLists, actions } from "../../store/syncStore";
-  import __ from "@/common/i18n";
-  import { fade, fly } from "svelte/transition";
-
-  let { open = $bindable(false), onSetView } = $props();
-
-  const setView = (view) => {
-    if (onSetView) onSetView(view);
-    open = false;
-  };
-</script>
-
-{#if open}
-  <div
-    class="overlay"
-    onclick={() => (open = false)}
-    role="button"
-    tabindex="0"
-    onkeydown={(e) => e.key === "Escape" && (open = false)}
-    transition:fade
-  ></div>
-  <aside class="drawer" transition:fly={{ x: -300, duration: 300 }}>
-    <nav>
-      <ul>
-        <li>
-          <button onclick={() => setView("all")}>
-            <i class="fas fa-list"></i>
-            {__("ui_tab_list")}
-          </button>
-        </li>
-        <li>
-          <button onclick={() => setView("pinned")}>
-            <i class="fas fa-thumbtack"></i>
-            {__("ui_pinned")}
-          </button>
-        </li>
-
-        <li class="divider"></li>
-
-        {#each Object.keys($taggedLists) as tag}
-          <li>
-            <button onclick={() => setView(`tag:${tag}`)}>
-              <i class="fas fa-label"></i>
-              {tag}
-            </button>
-          </li>
-        {/each}
-
-        <li class="divider"></li>
-
-        <li>
-          <button onclick={() => setView("options")}>
-            <i class="fas fa-cog"></i>
-            {__("ui_options")}
-          </button>
-        </li>
-      </ul>
-    </nav>
-  </aside>
-{/if}
-
-<style>
-  .overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
-  }
-  .drawer {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 280px;
-    height: 100%;
-    background: white;
-    z-index: 1001;
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
-    padding: 16px 0;
-  }
-  ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-  li button {
-    width: 100%;
-    text-align: left;
-    padding: 12px 24px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    font-size: 0.9rem;
-    color: #374151;
-  }
-  li button:hover {
-    background: #f3f4f6;
-  }
-  li button i {
-    width: 20px;
-    color: #6b7280;
-  }
-  .divider {
-    height: 1px;
-    background: #e5e7eb;
-    margin: 8px 0;
-  }
-</style>
-````
-
-## File: src/app/component/main/Snackbar.svelte
-````svelte
-<script>
-  import { rawStore } from "../../store/syncStore";
-  import { fade } from "svelte/transition";
-
-  // We'll use a local state for the snackbar derived from rawStore or manage it here
-  let snackbar = $derived($rawStore.snackbar || { status: false, msg: "" });
-
-  const close = () => {
-    rawStore.update((s) => ({ ...s, snackbar: { status: false, msg: "" } }));
-  };
-
-  $effect(() => {
-    if (snackbar.status) {
-      setTimeout(close, 3000);
-    }
-  });
-</script>
-
-{#if snackbar.status}
-  <div class="snackbar" transition:fade>
-    {snackbar.msg}
-  </div>
-{/if}
-
-<style>
-  .snackbar {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #333;
-    color: white;
-    padding: 12px 24px;
-    border-radius: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    z-index: 2000;
-    font-size: 0.875rem;
-  }
-</style>
-````
-
-## File: src/app/component/main/Toolbar.svelte
-````svelte
-<script>
-  import { opts, actions } from "../../store/syncStore";
-  import __ from "@/common/i18n";
-
-  let { onToggleDrawer } = $props();
-  let nightmode = $derived($opts.nightmode || false);
-</script>
-
-<nav class="toolbar" class:dark={nightmode}>
-  <div class="left">
-    <button class="icon-btn" onclick={onToggleDrawer} aria-label="Toggle Drawer">
-      <i class="fas fa-bars"></i>
-    </button>
-    <span class="logo">IceTab</span>
-  </div>
-
-  <div class="center">
-    <!-- Search could go here if implemented -->
-  </div>
-
-  <div class="right">
-    <button
-      class="icon-btn"
-      onclick={actions.cleanAll}
-      title={__("ui_clean_all")}
-    >
-      <i class="fas fa-magic"></i>
-    </button>
-
-    <button class="icon-btn" title={__("ui_nightmode")}>
-      <i class={nightmode ? "fas fa-sun" : "fas fa-moon"}></i>
-    </button>
-  </div>
-</nav>
-
-<style>
-  .toolbar {
-    height: 64px;
-    background: #3b82f6;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 16px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    z-index: 100;
-  }
-  .toolbar.dark {
-    background: #1f2937;
-  }
-  .left {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .logo {
-    font-size: 1.25rem;
-    font-weight: bold;
-  }
-  .icon-btn {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 1.25rem;
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 50%;
-    transition: background 0.2s;
-  }
-  .icon-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-  }
-</style>
-````
-
-## File: src/app/page/main/DetailList.svelte
-````svelte
-<script>
-  import { actions, aiLoading, opts } from "../../store/syncStore";
-  import __ from "@/common/i18n";
-  import { formatTime, getColorByHash, getDomain } from "@/common/utils";
-  import { flip } from "svelte/animate";
-  import { fade } from "svelte/transition";
-
-  let { lists = [], title = "Tab Lists" } = $props();
-
-  // State for pagination
-  let currentPage = $state(1);
-  let itemsPerPage = $derived($opts.listsPerPage || 10);
-  let pageCount = $derived(Math.ceil(lists.length / itemsPerPage));
-  let paginatedLists = $derived(
-    lists.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
-  );
-
-  // Reset page when lists change
-  $effect(() => {
-    if (lists) currentPage = 1;
-  });
-
-  // Expand/Collapse state
-  let expandedLists = $state(new Set());
-
-  const toggleExpand = (id) => {
-    // Reactivity for Set in Svelte 5: reassign or use SvelteSet.
-    // We'll use reassignment to be safe and simple.
-    const newSet = new Set(expandedLists);
-    if (newSet.has(id)) newSet.delete(id);
-    else newSet.add(id);
-    expandedLists = newSet;
-  };
-
-  const handleCleanAll = async () => {
-    await actions.cleanAll();
-  };
-
-  const handleCategorize = async (index, e) => {
-    e.stopPropagation();
-    await actions.categorizeList(index);
-  };
-
-  const handlePin = (id, pinned, e) => {
-    e.stopPropagation();
-    actions.pinList(id, pinned);
-  };
-
-  const handleRemove = (id, e) => {
-    e.stopPropagation();
-    actions.removeList(id);
-  };
-</script>
-
-<div class="detail-container">
-  <header class="list-header">
-    <h1>{__("ui_my_tab_lists")} ({lists.length})</h1>
-    <button class="btn-clean" onclick={handleCleanAll}>
-      <i class="fas fa-magic"></i>
-      {__("ui_clean_all")}
-    </button>
-  </header>
-
-  <div class="list-grid">
-    {#each paginatedLists as list, i (list._id)}
-      <div
-        class="tab-list-card"
-        class:pinned={list.pinned}
-        class:ai-suggested={$aiLoading === list._id}
-        animate:flip={{ duration: 300 }}
+<div class="tag-input-wrapper">
+  <div class="tag-input-container">
+    <i class="fas fa-tag input-icon"></i>
+    <input
+      type="text"
+      class="tag-input"
+      bind:value={inputValue}
+      {placeholder}
+      onkeydown={handleKeyDown}
+      oninput={handleInput}
+      onfocus={() => showSuggestions = inputValue.trim().length > 0}
+      onblur={handleBlur}
+    />
+    {#if inputValue}
+      <button 
+        class="clear-input" 
+        onclick={() => { inputValue = ""; showSuggestions = false; }}
+        aria-label="Clear"
       >
-        <div
-          class="card-header"
-          onclick={() => toggleExpand(list._id)}
-          role="button"
-          tabindex="0"
-          onkeydown={(e) => e.key === "Enter" && toggleExpand(list._id)}
-        >
-          <div class="header-main">
-            <span
-              class="tab-count"
-              style="background-color: {list.color || '#eee'}"
-            >
-              {list.tabs.length}
-              {__("ui_tabs")}
-            </span>
-            <span class="created-at"
-              >{__("ui_created")} {formatTime(list.time)}</span
-            >
-            {#if list.category}
-              <span class="category-badge" transition:fade>{list.category}</span
-              >
-            {/if}
-            <h2 class="title">{list.title || __("ui_untitled_list")}</h2>
-          </div>
-
-          <div class="header-actions">
-            <button
-              onclick={(e) => handlePin(list._id, !list.pinned, e)}
-              title={list.pinned ? __("ui_unpin") : __("ui_pin")}
-            >
-              <i class="fas fa-thumbtack" class:active={list.pinned}></i>
-            </button>
-            <button
-              onclick={(e) => handleCategorize(i, e)}
-              disabled={$aiLoading === list._id}
-              aria-label="Categorize list"
-            >
-              <i class="fas fa-robot" class:loading={$aiLoading === list._id}
-              ></i>
-            </button>
-            <button
-              onclick={(e) => handleRemove(list._id, e)}
-              aria-label="Delete list"
-            >
-              <i class="fas fa-trash"></i>
-            </button>
-          </div>
-        </div>
-
-        {#if expandedLists.has(list._id)}
-          <div class="card-body" transition:fade>
-            <div class="tabs-grid">
-              {#each list.tabs as tab}
-                <!-- Svelte 5 keying is implicity handled in each block, but check if we need key -->
-                <div class="tab-item">
-                  <img
-                    src={tab.favIconUrl ||
-                      `https://www.google.com/s2/favicons?domain=${getDomain(tab.url)}`}
-                    alt=""
-                    class="favicon"
-                  />
-                  <a href={tab.url} target="_blank" class="tab-link"
-                    >{tab.title}</a
-                  >
-                  <span class="tab-domain">{getDomain(tab.url)}</span>
-                </div>
-              {/each}
-            </div>
-            <div class="list-footer">
-              <button onclick={() => actions.restoreList(list._id)}
-                >{__("ui_restore_all")}</button
-              >
-            </div>
-          </div>
-        {/if}
-      </div>
-    {/each}
+        <i class="fas fa-times"></i>
+      </button>
+    {/if}
   </div>
-
-  {#if pageCount > 1}
-    <div class="pagination">
-      {#each Array(pageCount) as _, i}
+  
+  {#if showSuggestions && suggestions.length > 0}
+    <div class="suggestions-panel">
+      {#each suggestions as suggestion, index}
         <button
-          class:active={currentPage === i + 1}
-          onclick={() => (currentPage = i + 1)}
+          class="suggestion-item"
+          class:focused={index === focusedIndex}
+          onclick={() => addTag(suggestion)}
         >
-          {i + 1}
+          <i class="fas fa-tag"></i>
+          <span>{suggestion}</span>
         </button>
       {/each}
     </div>
@@ -1210,367 +266,710 @@ if __name__ == "__main__":
 </div>
 
 <style>
-  .detail-container {
-    padding: 24px;
-    max-width: 1000px;
-    margin: 0 auto;
+  .tag-input-wrapper {
+    position: relative;
+    width: 100%;
   }
-
-  .list-header {
+  
+  .tag-input-container {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
-  }
-
-  .btn-clean {
-    background: #6366f1;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 600;
-  }
-
-  .list-grid {
-    display: grid;
-    gap: 16px;
-  }
-
-  .tab-list-card {
-    border: 1px solid #e5e7eb;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #25262b;
+    border: 1px solid #2c2e33;
     border-radius: 8px;
-    overflow: hidden;
-    background: white;
-    transition: box-shadow 0.2s;
+    transition: all 0.2s;
   }
-
-  .tab-list-card:hover {
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  
+  .tag-input-container:focus-within {
+    background: #2c2e33;
+    border-color: #ff922b;
+    box-shadow: 0 0 0 3px rgba(255, 146, 43, 0.1);
   }
-
-  .card-header {
-    padding: 16px;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .header-main {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  .tab-count {
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: bold;
-  }
-
-  .created-at {
-    font-size: 0.75rem;
-    color: #6b7280;
-  }
-
-  .category-badge {
-    background: #e0e7ff;
-    color: #4338ca;
-    padding: 2px 8px;
-    border-radius: 9999px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    /* Pulse effect */
-  }
-
-  .tab-list-card.ai-suggested .category-badge {
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse {
-    0% {
-      opacity: 1;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 0.6;
-      transform: scale(1.05);
-    }
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-
-  .header-actions {
-    display: flex;
-    gap: 8px;
-  }
-
-  .header-actions button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #9ca3af;
-    padding: 4px;
-  }
-
-  .header-actions button:hover {
-    color: #4b5563;
-  }
-
-  .fas.active {
-    color: #3b82f6;
-  }
-
-  .card-body {
-    padding: 16px;
-    border-top: 1px solid #f3f4f6;
-    background: #f9fafb;
-    color: initial;
-  }
-
-  .tabs-grid {
-    display: grid;
-    gap: 8px;
-  }
-
-  .tab-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  
+  .input-icon {
+    color: #5c5f66;
     font-size: 0.875rem;
   }
-
-  .favicon {
-    width: 16px;
-    height: 16px;
-  }
-
-  .tab-link {
-    color: #3b82f6;
-    text-decoration: none;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  
+  .tag-input {
     flex: 1;
+    background: transparent;
+    border: none;
+    color: #e4e4e7;
+    font-size: 0.875rem;
+    outline: none;
   }
-
-  .tab-domain {
-    color: #9ca3af;
-    font-size: 0.75rem;
+  
+  .tag-input::placeholder {
+    color: #5c5f66;
   }
-
-  .pagination {
-    margin-top: 24px;
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-  }
-
-  .pagination button {
-    width: 32px;
-    height: 32px;
-    border: 1px solid #e5e7eb;
-    background: white;
-    border-radius: 4px;
+  
+  .clear-input {
+    background: transparent;
+    border: none;
+    color: #5c5f66;
+    padding: 4px;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    border-radius: 4px;
+    transition: all 0.2s;
   }
-
-  .pagination button.active {
-    background: #6366f1;
-    color: white;
-    border-color: #6366f1;
+  
+  .clear-input:hover {
+    background: #3c3e44;
+    color: #909296;
+  }
+  
+  .suggestions-panel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #1a1b1e;
+    border: 1px solid #2c2e33;
+    border-radius: 8px;
+    padding: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 100;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  
+  .suggestion-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    background: transparent;
+    border: none;
+    color: #c1c2c5;
+    font-size: 0.875rem;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+  
+  .suggestion-item:hover,
+  .suggestion-item.focused {
+    background: #25262b;
+    color: #e4e4e7;
+  }
+  
+  .suggestion-item i {
+    color: #5c5f66;
+    font-size: 0.75rem;
   }
 </style>
 ````
 
-## File: src/app/store/bridge.js
-````javascript
-import listManager from '@/common/listManager'
-import browser from 'webextension-polyfill'
-
-// Initialize the listManager for the frontend context
-listManager.init()
-
-/**
- * Bridge function to handle listManager mutations in a Svelte-friendly way.
- * This can be used by the Svelte stores to listen for changes from the background
- * or other tabs.
- */
-export const listenForChanges = (callback) => {
-  // Listen for 'refresh' messages from listManager (via sendMessage)
-  const listener = (message) => {
-    if (message.refresh || message.listModifed) {
-      callback(message)
+## File: src/app/page/settings/SettingsView.svelte
+````svelte
+<script>
+  import browser from "webextension-polyfill";
+  import { syncStore } from "../../store/syncStore.svelte.js";
+  import CustomSync from "@/common/service/custom-sync";
+  
+  let { onBack } = $props();
+  
+  // Settings state
+  let settings = $state({
+    syncBaseUrl: "",
+    syncApiKey: "",
+    autoSyncEnabled: true,
+    autoSyncInterval: 300, // seconds
+    confirmBeforeRestore: true,
+    defaultRestoreBehavior: "current-window", // "current-window" | "new-window"
+    deleteUnpinnedOnRestore: true,
+  });
+  
+  let saveStatus = $state(null); // "saving" | "success" | "error"
+  let testStatus = $state(null); // "testing" | "success" | "error"
+  let testMessage = $state("");
+  
+  // Load settings on mount
+  $effect(() => {
+    loadSettings();
+  });
+  
+  async function loadSettings() {
+    const opts = await browser.storage.local.get("opts");
+    if (opts.opts) {
+      settings.syncBaseUrl = opts.opts.syncBaseUrl || "http://localhost:8000";
+      settings.syncApiKey = opts.opts.syncApiKey || "";
+      settings.autoSyncEnabled = opts.opts.autoSyncEnabled ?? true;
+      settings.autoSyncInterval = opts.opts.autoSyncInterval || 300;
+      settings.confirmBeforeRestore = opts.opts.confirmBeforeRestore ?? true;
+      settings.defaultRestoreBehavior = opts.opts.defaultRestoreBehavior || "current-window";
+      settings.deleteUnpinnedOnRestore = opts.opts.deleteUnpinnedOnRestore ?? true;
     }
   }
-  browser.runtime.onMessage.addListener(listener)
-  return () => browser.runtime.onMessage.removeListener(listener)
-}
-
-export default listManager
-````
-
-## File: src/app/store/syncStore.js
-````javascript
-import { writable, derived, get } from 'svelte/store'
-import browser from 'webextension-polyfill'
-import CustomSync from '@/common/service/custom-sync'
-import tabsHelper from '@/common/tabs'
-import manager from './bridge'
-import _ from 'lodash'
-
-// Raw store for lists and options
-export const rawStore = writable({
-  lists: [],
-  opts: {},
-  aiLoading: null, // ID of the list currently being processed by AI
-  syncing: false
-})
-
-// Initialize the store
-const initStore = async () => {
-  const data = await browser.storage.local.get(['lists', 'opts'])
-  rawStore.update(s => ({
-    ...s,
-    lists: data.lists || [],
-    opts: data.opts || {}
-  }))
-}
-
-initStore()
-
-// Listen for storage changes to keep rawStore in sync
-browser.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local') {
-    rawStore.update(state => {
-      const newState = { ...state }
-      if (changes.lists) newState.lists = changes.lists.newValue || []
-      if (changes.opts) newState.opts = changes.opts.newValue || {}
-      return newState
-    })
-  }
-})
-
-// Derived stores for components
-export const lists = derived(rawStore, $s => $s.lists)
-export const opts = derived(rawStore, $s => $s.opts)
-export const aiLoading = derived(rawStore, $s => $s.aiLoading)
-
-export const pinnedLists = derived(lists, $lists => $lists.filter(l => l.pinned))
-export const taggedLists = derived(lists, $lists => {
-  const tagged = {}
-  $lists.forEach(l => {
-    (l.tags || []).forEach(t => {
-      if (!tagged[t]) tagged[t] = []
-      tagged[t].push(l)
-    })
-  })
-  return tagged
-})
-
-/**
- * FastAPI Sync Logic
- */
-
-// Debounced push to FastAPI
-const debouncedPush = _.debounce(async (listsData) => {
-  rawStore.update(s => ({ ...s, syncing: true }))
-  try {
-    // Push all lists or just the ones that changed? 
-    // Usually, we push the state. Here we'll push all for simplicity or specific ones if needed.
-    // The user mentioned: "If you're rapidly moving tabs between lists, wait 2 seconds... before 'pushing'"
-    // We'll push all lists to the server.
-    for (const list of listsData) {
-      await CustomSync.upload(list)
-    }
-    console.debug('FastAPI Sync Complete')
-  } catch (err) {
-    console.error('FastAPI Sync Failed:', err)
-  } finally {
-    rawStore.update(s => ({ ...s, syncing: false }))
-  }
-}, 2000)
-
-// Watch lists and trigger sync
-lists.subscribe($lists => {
-  if ($lists.length > 0) {
-    debouncedPush($lists)
-  }
-})
-
-/**
- * Actions
- */
-
-export const actions = {
-  async categorizeList(listIndex) {
-    const currentLists = get(lists)
-    const list = currentLists[listIndex]
-    if (!list) return
-
-    rawStore.update(s => ({ ...s, aiLoading: list._id }))
+  
+  async function saveSettings() {
+    saveStatus = "saving";
     try {
-      const result = await CustomSync.AI.categorize(list.tabs)
-      if (result.category) {
-        manager.updateListById(list._id, { category: result.category })
-      }
-      if (result.tags) {
-        manager.updateListById(list._id, { tags: result.tags })
-      }
-      return result
-    } catch (err) {
-      console.error('AI Categorization failed:', err)
-      throw err
-    } finally {
-      rawStore.update(s => ({ ...s, aiLoading: null }))
+      const opts = await browser.storage.local.get("opts");
+      const updatedOpts = {
+        ...(opts.opts || {}),
+        syncBaseUrl: settings.syncBaseUrl.trim(),
+        syncApiKey: settings.syncApiKey.trim(),
+        autoSyncEnabled: settings.autoSyncEnabled,
+        autoSyncInterval: settings.autoSyncInterval,
+        confirmBeforeRestore: settings.confirmBeforeRestore,
+        defaultRestoreBehavior: settings.defaultRestoreBehavior,
+        deleteUnpinnedOnRestore: settings.deleteUnpinnedOnRestore,
+      };
+      
+      await browser.storage.local.set({ opts: updatedOpts });
+      saveStatus = "success";
+      setTimeout(() => {
+        saveStatus = null;
+      }, 2000);
+      
+      syncStore.updateSnackbar("Settings saved successfully");
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+      saveStatus = "error";
+      setTimeout(() => {
+        saveStatus = null;
+      }, 3000);
     }
-  },
-
-  async cleanAll() {
-    const currentLists = get(lists)
-    for (let i = 0; i < currentLists.length; i++) {
-      await this.categorizeList(i)
-    }
-  },
-
-  updateList(listId, updates) {
-    manager.updateListById(listId, updates)
-  },
-
-  removeList(listId) {
-    manager.removeListById(listId)
-  },
-
-  pinList(listId, pinned) {
-    manager.updateListById(listId, { pinned })
-  },
-
-  moveListUp(listId) {
-    manager.changeListOrderRelatively(listId, -1)
-  },
-
-  moveListDown(listId) {
-    manager.changeListOrderRelatively(listId, 1)
-  },
-
-  async restoreList(listId, inNewWindow = false) {
-    const currentLists = get(lists)
-    const list = currentLists.find(l => l._id === listId)
-    if (!list) return
-
-    await tabsHelper.restoreTabs(list.tabs, inNewWindow)
-    this.removeList(listId)
-  },
-
-  changeColor(listId, color) {
-    manager.updateListById(listId, { color })
   }
-}
+  
+  async function testConnection() {
+    testStatus = "testing";
+    testMessage = "Testing connection...";
+    
+    try {
+      const opts = await browser.storage.local.get("opts");
+      const tempOpts = {
+        ...(opts.opts || {}),
+        syncBaseUrl: settings.syncBaseUrl.trim(),
+        syncApiKey: settings.syncApiKey.trim(),
+      };
+      await browser.storage.local.set({ opts: tempOpts });
+      
+      const health = await CustomSync.health();
+      testStatus = "success";
+      testMessage = "\u2713 Connected to " + (health.service || "sync service") + " v" + (health.version || "?");
+      setTimeout(() => {
+        testStatus = null;
+        testMessage = "";
+      }, 5000);
+    } catch (error) {
+      testStatus = "error";
+      if (error.code === "offline") {
+        testMessage = "\u2717 Cannot reach server. Check URL and network connection.";
+      } else if (error.code === "auth") {
+        testMessage = "\u2717 Authentication failed. Check your API key.";
+      } else {
+        testMessage = "\u2717 " + error.message;
+      }
+      setTimeout(() => {
+        testStatus = null;
+        testMessage = "";
+      }, 5000);
+    }
+  }
+  
+  function resetToDefaults() {
+    const confirmed = confirm("Reset all settings to defaults?");
+    if (!confirmed) return;
+    
+    settings.syncBaseUrl = "http://localhost:8000";
+    settings.syncApiKey = "";
+    settings.autoSyncEnabled = true;
+    settings.autoSyncInterval = 300;
+    settings.confirmBeforeRestore = true;
+    settings.defaultRestoreBehavior = "current-window";
+    settings.deleteUnpinnedOnRestore = true;
+  }
+</script>
+
+<div class="settings-view">
+  <header class="settings-header">
+    <button class="back-btn" onclick={onBack}>
+      <i class="fas fa-arrow-left"></i>
+      <span>Back</span>
+    </button>
+    <h1>Settings</h1>
+  </header>
+  
+  <div class="settings-content">
+    <!-- Sync Settings Section -->
+    <section class="settings-section">
+      <div class="section-header">
+        <i class="fas fa-sync section-icon"></i>
+        <h2>Sync Configuration</h2>
+      </div>
+      
+      <div class="setting-group">
+        <label for="sync-url" class="setting-label">
+          Sync Server URL
+          <span class="label-hint">The backend service URL for syncing your stashes</span>
+        </label>
+        <input
+          id="sync-url"
+          type="url"
+          class="setting-input"
+          bind:value={settings.syncBaseUrl}
+          placeholder="http://localhost:8000"
+        />
+      </div>
+      
+      <div class="setting-group">
+        <label for="api-key" class="setting-label">
+          API Key
+          <span class="label-hint">Your authentication key for the sync service</span>
+        </label>
+        <input
+          id="api-key"
+          type="password"
+          class="setting-input"
+          bind:value={settings.syncApiKey}
+          placeholder="Enter your API key"
+        />
+      </div>
+      
+      <div class="setting-actions">
+        <button 
+          class="test-btn" 
+          onclick={testConnection}
+          disabled={testStatus === "testing"}
+        >
+          <i class={`fas ${testStatus === "testing" ? "fa-spinner fa-spin" : "fa-plug"}`}></i>
+          <span>{testStatus === "testing" ? "Testing..." : "Test Connection"}</span>
+        </button>
+        
+        {#if testMessage}
+          <div class="test-result" class:success={testStatus === "success"} class:error={testStatus === "error"}>
+            {testMessage}
+          </div>
+        {/if}
+      </div>
+      
+      <div class="setting-group">
+        <label class="setting-checkbox">
+          <input
+            type="checkbox"
+            bind:checked={settings.autoSyncEnabled}
+          />
+          <span>Enable automatic sync</span>
+          <span class="checkbox-hint">Automatically sync changes to the server</span>
+        </label>
+      </div>
+      
+      {#if settings.autoSyncEnabled}
+        <div class="setting-group">
+          <label for="sync-interval" class="setting-label">
+            Sync Interval
+            <span class="label-hint">Time between automatic syncs (seconds)</span>
+          </label>
+          <input
+            id="sync-interval"
+            type="number"
+            class="setting-input small"
+            bind:value={settings.autoSyncInterval}
+            min="60"
+            max="3600"
+            step="60"
+          />
+          <span class="input-suffix">{Math.floor(settings.autoSyncInterval / 60)} minutes</span>
+        </div>
+      {/if}
+    </section>
+    
+    <!-- Restore Behavior Section -->
+    <section class="settings-section">
+      <div class="section-header">
+        <i class="fas fa-folder-open section-icon"></i>
+        <h2>Restore Behavior</h2>
+      </div>
+      
+      <div class="setting-group">
+        <label class="setting-checkbox">
+          <input
+            type="checkbox"
+            bind:checked={settings.confirmBeforeRestore}
+          />
+          <span>Confirm before restoring</span>
+          <span class="checkbox-hint">Show confirmation dialog when restoring stashes</span>
+        </label>
+      </div>
+      
+      <div class="setting-group">
+        <label for="restore-target" class="setting-label">
+          Default restore location
+        </label>
+        <select
+          id="restore-target"
+          class="setting-select"
+          bind:value={settings.defaultRestoreBehavior}
+        >
+          <option value="current-window">Current window</option>
+          <option value="new-window">New window</option>
+        </select>
+      </div>
+      
+      <div class="setting-group">
+        <label class="setting-checkbox">
+          <input
+            type="checkbox"
+            bind:checked={settings.deleteUnpinnedOnRestore}
+          />
+          <span>Delete unpinned stashes after restore</span>
+          <span class="checkbox-hint">Pinned stashes are always kept after restore</span>
+        </label>
+      </div>
+    </section>
+    
+    <!-- About Section -->
+    <section class="settings-section">
+      <div class="section-header">
+        <i class="fas fa-info-circle section-icon"></i>
+        <h2>About</h2>
+      </div>
+      
+      <div class="about-content">
+        <div class="about-row">
+          <span class="about-label">Extension Version</span>
+          <span class="about-value">2025.6.10.04</span>
+        </div>
+        <div class="about-row">
+          <span class="about-label">Total Stashes</span>
+          <span class="about-value">{syncStore.lists.length}</span>
+        </div>
+        <div class="about-row">
+          <span class="about-label">Total Tabs Saved</span>
+          <span class="about-value">
+            {syncStore.lists.reduce((sum, list) => sum + (list.tabs?.length || 0), 0)}
+          </span>
+        </div>
+      </div>
+    </section>
+  </div>
+  
+  <footer class="settings-footer">
+    <button class="reset-btn" onclick={resetToDefaults}>
+      <i class="fas fa-undo"></i>
+      <span>Reset to Defaults</span>
+    </button>
+    
+    <button 
+      class="save-btn" 
+      onclick={saveSettings}
+      disabled={saveStatus === "saving"}
+    >
+      <i class={`fas ${saveStatus === "saving" ? "fa-spinner fa-spin" : "fa-save"}`}></i>
+      <span>
+        {#if saveStatus === "saving"}
+          Saving...
+        {:else if saveStatus === "success"}
+          Saved!
+        {:else}
+          Save Settings
+        {/if}
+      </span>
+    </button>
+  </footer>
+</div>
+
+<style>
+  .settings-view {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #141517;
+  }
+  
+  .settings-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 24px;
+    border-bottom: 1px solid #2c2e33;
+    background: #1a1b1e;
+  }
+  
+  .back-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: #25262b;
+    border: 1px solid #2c2e33;
+    border-radius: 8px;
+    color: #c1c2c5;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .back-btn:hover {
+    background: #2c2e33;
+    color: #e4e4e7;
+  }
+  
+  .settings-header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #e4e4e7;
+    margin: 0;
+  }
+  
+  .settings-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+  }
+  
+  .settings-section {
+    background: #1a1b1e;
+    border: 1px solid #2c2e33;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #2c2e33;
+  }
+  
+  .section-icon {
+    color: #ff922b;
+    font-size: 1.25rem;
+  }
+  
+  .section-header h2 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #e4e4e7;
+    margin: 0;
+  }
+  
+  .setting-group {
+    margin-bottom: 20px;
+  }
+  
+  .setting-group:last-child {
+    margin-bottom: 0;
+  }
+  
+  .setting-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #e4e4e7;
+    margin-bottom: 8px;
+  }
+  
+  .label-hint {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: #909296;
+    margin-top: 4px;
+  }
+  
+  .setting-input,
+  .setting-select {
+    width: 100%;
+    padding: 10px 14px;
+    background: #25262b;
+    border: 1px solid #2c2e33;
+    border-radius: 8px;
+    color: #e4e4e7;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+  }
+  
+  .setting-input:focus,
+  .setting-select:focus {
+    outline: none;
+    background: #2c2e33;
+    border-color: #ff922b;
+    box-shadow: 0 0 0 3px rgba(255, 146, 43, 0.1);
+  }
+  
+  .setting-input.small {
+    width: 120px;
+  }
+  
+  .input-suffix {
+    margin-left: 12px;
+    font-size: 0.875rem;
+    color: #909296;
+  }
+  
+  .setting-checkbox {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    padding: 12px;
+    border-radius: 8px;
+    transition: background 0.2s;
+  }
+  
+  .setting-checkbox:hover {
+    background: #25262b;
+  }
+  
+  .setting-checkbox input[type="checkbox"] {
+    margin-top: 2px;
+    cursor: pointer;
+  }
+  
+  .setting-checkbox > span:first-of-type {
+    flex: 1;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #e4e4e7;
+  }
+  
+  .checkbox-hint {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: #909296;
+    margin-top: 4px;
+  }
+  
+  .setting-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+  
+  .test-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    background: rgba(77, 171, 247, 0.15);
+    border: 1px solid rgba(77, 171, 247, 0.3);
+    border-radius: 8px;
+    color: #4dabf7;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .test-btn:hover:not(:disabled) {
+    background: rgba(77, 171, 247, 0.25);
+  }
+  
+  .test-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  
+  .test-result {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  
+  .test-result.success {
+    background: rgba(64, 192, 87, 0.15);
+    color: #40c057;
+    border: 1px solid rgba(64, 192, 87, 0.3);
+  }
+  
+  .test-result.error {
+    background: rgba(250, 82, 82, 0.15);
+    color: #fa5252;
+    border: 1px solid rgba(250, 82, 82, 0.3);
+  }
+  
+  .about-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .about-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: #25262b;
+    border-radius: 8px;
+  }
+  
+  .about-label {
+    font-size: 0.875rem;
+    color: #909296;
+  }
+  
+  .about-value {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #e4e4e7;
+  }
+  
+  .settings-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-top: 1px solid #2c2e33;
+    background: #1a1b1e;
+  }
+  
+  .reset-btn,
+  .save-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .reset-btn {
+    background: transparent;
+    border: 1px solid #2c2e33;
+    color: #909296;
+  }
+  
+  .reset-btn:hover {
+    background: #25262b;
+    color: #c1c2c5;
+  }
+  
+  .save-btn {
+    background: linear-gradient(135deg, #ff922b 0%, #ff6b35 100%);
+    border: none;
+    color: #ffffff;
+  }
+  
+  .save-btn:hover:not(:disabled) {
+    box-shadow: 0 4px 12px rgba(255, 146, 43, 0.4);
+    transform: translateY(-1px);
+  }
+  
+  .save-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+</style>
 ````
 
 ## File: src/assets/css/fontawesome-all.min.css
@@ -5007,126 +4406,32 @@ export default autoreload
 export default (...args) => chrome.i18n.getMessage(...args)
 ````
 
-## File: src/common/logger.svelte.js
+## File: src/common/intents.js
 ````javascript
-let logs = $state([]);
+import browser from 'webextension-polyfill';
+import { RUNTIME_MESSAGES } from './constants';
 
-export const logger = {
-  get entries() { return logs; },
-
-  add(type, message, data = null) {
-    const entry = {
-      timestamp: new Date().toISOString(),
-      type,
-      message,
-      data: data ? JSON.parse(JSON.stringify(data)) : null // snapshot
-    };
-    logs.push(entry);
-    if (logs.length > 100) logs.shift(); // keep it light
-
-    // Also log to console for dev
-    console[type === 'error' ? 'error' : 'log'](`[IceTab] ${message}`, data || '');
-  },
-
-  clear() {
-    logs = [];
-  },
-
-  // Bridge methods for compatibility with old logger
-  log(message, ...args) {
-    this.add('log', message, args.length > 0 ? args : null);
-  },
-  error(message, ...args) {
-    this.add('error', message, args.length > 0 ? args : null);
-  },
-  warn(message, ...args) {
-    // Map warn to log or error, or add specific type
-    this.add('warn', message, args.length > 0 ? args : null);
-  },
-  info(message, ...args) {
-    this.add('info', message, args.length > 0 ? args : null);
-  },
-  debug(message, ...args) {
-    // debug might be verbose, maybe optional?
-    this.add('debug', message, args.length > 0 ? args : null);
-  },
-  init() {
-    // No-op for compatibility
-  }
+export const sendStashCurrentTabIntent = (source = 'app') => {
+  return browser.runtime.sendMessage({
+    type: RUNTIME_MESSAGES.STASH_CURRENT_TAB,
+    payload: { source },
+  });
 };
-
-export default logger;
 ````
 
-## File: src/common/service/custom-sync.js
+## File: src/common/runtimeContext.js
 ````javascript
-import storage from '../storage'
-import { SYNCED_LIST_PROPS } from '../constants'
-import _ from 'lodash'
+const POPUP_CONTEXT = 'popup';
 
-const getSettings = async () => {
-  const opts = await storage.getOptions()
-  return {
-    baseUrl: opts.syncBaseUrl || 'http://localhost:8000',
-    apiKey: opts.syncApiKey || '',
+export const getRuntimeSource = () => {
+  if (typeof window === 'undefined' || typeof window.location === 'undefined') {
+    return 'app';
   }
-}
+  const params = new URLSearchParams(window.location.search || '');
+  return params.get('context') === POPUP_CONTEXT ? POPUP_CONTEXT : 'app';
+};
 
-const fetchData = async (path, method = 'GET', body = null) => {
-  const { baseUrl, apiKey } = await getSettings()
-  const url = `${baseUrl}${path}`
-  const headers = {
-    'x-api-key': apiKey,
-    'Content-Type': 'application/json',
-  }
-  const options = {
-    method,
-    headers,
-  }
-  if (body) {
-    options.body = JSON.stringify(body)
-  }
-  const response = await fetch(url, options)
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`)
-  }
-  return response.json()
-}
-
-export const upload = async (list) => {
-  const syncedData = _.pick(list, SYNCED_LIST_PROPS)
-  // The API contract expects 'remote_id' instead of '_id'
-  return fetchData('/sync/push', 'POST', {
-    remote_id: syncedData._id,
-    ..._.omit(syncedData, '_id'),
-  })
-}
-
-export const download = async () => {
-  return fetchData('/sync/pull', 'GET')
-}
-
-export const health = async () => {
-  const { baseUrl } = await getSettings()
-  const response = await fetch(`${baseUrl}/health`)
-  if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`)
-  }
-  return response.json()
-}
-
-export const AI = {
-  categorize: async (tabs) => {
-    return fetchData('/ai/categorize', 'POST', { tabs })
-  },
-}
-
-export default {
-  upload,
-  download,
-  health,
-  AI,
-}
+export const isPopupContext = () => getRuntimeSource() === POPUP_CONTEXT;
 ````
 
 ## File: src/common/tab.js
@@ -5140,32 +4445,6 @@ export const normalizeTab = tab => {
   normalizedTab.muted = normalizedTab.muted || tab.mutedInfo && tab.mutedInfo.muted
   return normalizedTab
 }
-````
-
-## File: .eslintrc.yml
-````yaml
-root: true
-env:
-  es6: true
-  browser: true
-  webextensions: true
-extends:
-  - eslint:recommended
-parserOptions:
-  parser: '@babel/eslint-parser'
-  sourceType: module
-  ecmaVersion: 2020
-  requireConfigFile: false
-  babelOptions:
-    plugins:
-      - "@babel/plugin-syntax-dynamic-import"
-rules:
-  no-console: 0
-globals:
-  DEBUG: readonly
-  PRODUCTION: readonly
-  MOZ: readonly
-  ga: readonly
 ````
 
 ## File: .github/ISSUE_TEMPLATE.md
@@ -5307,28 +4586,120 @@ jobs:
           path: dist.zip
 ````
 
+## File: AGENTS.md
+````markdown
+# AGENTS.md
+
+This repository is actively maintained and does not rely on external agent configuration
+beyond what is documented here.
+
+## Purpose of this file
+
+This file exists to:
+
+- Declare how automated coding agents (e.g. Codex) should operate in this repository
+- Prevent agents from searching for missing or implied instructions
+- Define scope, priorities, and constraints clearly
+
+If you are an automated agent: **do not look for additional agent instructions elsewhere**.
+
+---
+
+## Project Overview
+
+This is a browser extension / web app for stashing, organising, and restoring browser tabs.
+It includes:
+- A Svelte-based UI
+- Centralised state management for lists, tags, pinning, restore semantics
+- Optional remote sync and AI-assisted categorisation
+- A Webpack-based build pipeline
+
+The codebase builds successfully in its current state.
+
+---
+
+## Agent Operating Rules
+
+When making changes, agents must follow these rules:
+
+1. **Sequential work**
+   - Work on one logical concern at a time.
+   - Do not mix refactors, feature work, and cosmetic changes in the same step.
+
+2. **No scope expansion**
+   - Do not add new features beyond what is already implied by the UI or existing store logic.
+   - Prefer fixing, completing, or removing over inventing.
+
+3. **Truth over appearance**
+   - Behavioural correctness and truthful state (especially sync state) take priority over UI polish.
+   - The app must not claim actions succeeded when they did not.
+
+4. **Remove dead ends**
+   - No visible UI control should be inert.
+   - If a control cannot be fully implemented, it should be removed or hidden.
+
+5. **Respect existing architecture**
+   - Business logic belongs in stores/services, not UI components.
+   - UI components should remain thin and declarative.
+
+---
+
+## Sync-Specific Guidance
+
+Sync is a sensitive area.
+
+Agents must ensure:
+- Failed syncs are surfaced honestly
+- Local-only states are not reported as successful syncs
+- Empty state changes can propagate correctly
+- Remote state is not silently orphaned
+
+Do not optimise sync logic at the expense of correctness.
+
+---
+
+## AI Features
+
+AI-assisted categorisation is optional and secondary.
+
+If touching AI-related code:
+- Do not make it automatic or implicit
+- Ensure users trigger it deliberately
+- Clearly define whether AI output overwrites or merges with user data
+- Handle loading and error states explicitly
+
+---
+
+## Build & Tooling
+
+- The project builds successfully using the existing Webpack configuration.
+- Do not introduce new build tools or migrate frameworks unless explicitly instructed.
+- Historical or archival files (e.g. old build logs) should not be treated as current failures.
+
+---
+
+## Definition of Done (for any agent task)
+
+A task is done only if:
+- The app builds successfully
+- The affected feature works end-to-end
+- The UI does not imply unavailable functionality
+- State transitions are truthful and predictable
+
+---
+
+## Final Note for Automated Agents
+
+Do not infer missing requirements.
+Do not search for undocumented agent prompts.
+Do not assume this repository is incomplete because this file exists.
+
+This file is the authoritative agent instruction.
+````
+
 ## File: bkp/key.txt
 ````
 "key": "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCvt1uCJaPGznWoI8HK00/TIt3z08dh56ysBL/10ZULl2ixJ7sh4NAFyADcXPItdPj/zF1s+1XdHHhCRv3aF4YwdJCwWX6Ybd0TD+g6XqAdW6LS4T/beLUdbJ08nyX0hq1yYbdwAyb58hxcN7/1ivwnJbn9qzukcJjRy0DFK/PNWh7C8Q7zGpgaryml37ecdcIoOlzqEEY/EiSUhxVGe7jtXl5mgVmZnrLBePTRvn8NadcaXWXyPY7BvP2WJLHIAqTHoDeJNNbP3knufgc63KJZL8uWzK2+2+mTGjW2W3ZEV4/S0CcT7Ii0E5uXny2s5RN1MIVBMrFnwEBnhcyywEyHAgMBAAECggEAGgrRzCMp98AHngjWounYjdFAFfAQP8lnRQNbM+KA9XvWL1NVH7tC+WhgAEjiN6x7buXp/sntOt0KUcBVxSnxYGMWQpyw74Rw3G9iGqyFjHRVWG272ho0tYywbRilNm1zbV1gI4DEGQ0x+NTmZUzY/DBSNW9YYpGxhH5cNhzCgG+Yw7BzpqAPZNn/1myHfZ1ToGk18eH/4isDiENzjvV2r8Qd3/itP1uvvg+MN+k6e8mCKZiCG1mcYImLg1/j5UwwZ5Q4S3nnDs+MyZuVaPAyyhYOW9+1q/tuhprBQ0Y43kVSK4uXKVyWm7Ho8ON2bSypa0WNPkUsmvVNH/JoOMumqQKBgQDmepvvgU3m2K2Ne+BLGvQQqIeFEGHgThxzSoAiCMd37ZlOEC25W3VN+U+xUM+EIloCdPh/Wdy0JAsKqjSHttlGGrdAgyjMeAN9Lb+y+wfhwUfSvdvuaDxtpqk71TWu4O/tPXYjHw/y2rbndTDSzg4o81h9/T4ZepteUMqutU0TuwKBgQDDLGOVYzSrA4E8bSTuabYpo2p1gxNSuRY5aa6Ar2e5Y6O0vw11mOHcE+bkDg93nC1gpg/Nvq6B1/iisd1Cd9gRbkwKxcjsQG8k9rYvOy0h8lARd1c7sjV3ErQVQ1a+zzlXcdsXMqyQkgBpvFDNFRrmZbjqCnYIfbznpLmwgAXvpQKBgBucNpADknyEGo5nd6Ans3NHbSywoLkJQnlBRIZPPO4OBZ6Ha6LX5P6ZTkW0o5d1sgi3UImZD0p5QuVdLHvRmMfALZHJ5JpSCkD1uRBM6E3QJLWHTxCJZivQmldznEG96qAmC7/7WaLDNsQVkuq+Co43ULOPIeBVgsVSsmUpjPk/AoGBAJrsADwTXDom9Q23ASqyBKO2kImouszeGBMInTiOgwH4YnjVcmSXLykXLx51PrfN44MlLcQ+CJ0OhtD16FCbeooTiA7BAoTtfIvVvbVt/pxEkGPc3ASJp8DVutZp9lBNgxGzUZpvYeT7z5IepfC0QP8DXa2BEkIZNLqW2cKNTKj1AoGBAKpKDLbp9DM+V1A6l8kjlbk33TKxHevKu3CkKQoYBt5vegAbcYh2IvJnBiV0/nNFJAxwbT+fiq1jscYnLpmoFMbs6JdbGOiq2bPs65Ceivo14mUDvzbbg8nQUSAwRAqABsQJq/F7d1Tz1tm7ag/4M1/JFmb1SRcvDeqAfJURIE5Q"
-````
-
-## File: config.js
-````javascript
-/* eslint-disable */
-module.exports = {
-  development: {
-    __CLIENT_ID__: '530831729511-eq8apt6dhjimbmdli90jp2ple0lfmn3l.apps.googleusercontent.com',
-    __DEV_CSP__: process.env.MOZ ? '' : ' http://localhost:8098 chrome-extension://nhdogjmejiglipccpnnnanhbledajbpd',
-    __EXT_NAME__: 'IceTab (dev)',
-    __CONTENT_SCRIPTS_MATCHES__: process.env.MOZ ? '*://*/*' : 'http://127.0.0.1:8000/*',
-  },
-  production: {
-    __CLIENT_ID__: '530831729511-dclgvblhv7var13mvpjochb5f295a6vc.apps.googleusercontent.com',
-    __DEV_CSP__: '',
-    __EXT_NAME__: '__MSG_ext_name__',
-    __CONTENT_SCRIPTS_MATCHES__: 'https://boss.cnwangjie.com/*',
-  }
-}
 ````
 
 ## File: CREDITS.md
@@ -5340,6 +4711,798 @@ module.exports = {
 # Current Maintainer
 
 * elijahcommits (GitHub: https://github.com/elijahcommits) - Myself.
+````
+
+## File: scripts/validate-build.sh
+````bash
+#!/bin/bash
+set -euo pipefail
+
+log_and_run() {
+  echo "[$1] $2"
+}
+
+log_and_run "lint" "Running ESLint"
+npm run lint
+
+log_and_run "build" "Building production bundle"
+build_log="$(mktemp)"
+trap 'rm -f "$build_log"' EXIT
+npm run build 2>&1 | tee "$build_log"
+
+log_and_run "check" "Scanning build output for warnings"
+if grep -qi "deprecated" "$build_log"; then
+  echo "[error] Build contains deprecation warnings"
+  exit 1
+fi
+
+if grep -qi "a11y" "$build_log"; then
+  echo "[error] Build contains accessibility warnings"
+  exit 1
+fi
+
+echo "[ok] Build validation passed"
+````
+
+## File: server/docker-compose.yml
+````yaml
+version: '3.8'
+
+services:
+  server:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - db_data:/app/data
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: always
+
+volumes:
+  db_data:
+````
+
+## File: server/Dockerfile
+````
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+````
+
+## File: server/README.md
+````markdown
+# IceTab Backend Server
+
+A lightweight FastAPI backend for tab synchronization and AI-powered categorization.
+
+## Features
+- **Sync**: Persistent tab lists stored in SQLite.
+- **AI Categorization**: Simple API to categorize tabs and find duplicates using OpenAI.
+- **Docker Ready**: Includes `Dockerfile` and `docker-compose.yml`.
+
+## Quick Start (Local)
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Set your environment variables (create a `.env` file):
+   ```env
+   OPENAI_API_KEY=your_key_here
+   ```
+3. Run the server:
+   ```bash
+   python main.py
+   ```
+   The server will be available at `http://localhost:8000`.
+
+## Quick Start (Docker)
+1. Set your `OPENAI_API_KEY` in `.env`.
+2. Run:
+   ```bash
+   docker-compose up -d
+   ```
+
+## Development Contract
+For details on the API endpoints and request/response formats, please see the [API Contract](../.gemini/antigravity/brain/39ddb5b8-89ab-4527-b899-f5eeda2f25e8/api_contract.md) (or refer to the `api_contract.md` in your artifacts).
+````
+
+## File: server/requirements.txt
+````
+fastapi
+uvicorn
+sqlalchemy
+openai
+pydantic-settings
+python-dotenv
+httpx
+````
+
+## File: server/seed_db.py
+````python
+from database import SessionLocal, User
+
+def seed():
+    db = SessionLocal()
+    # Check if test key already exists
+    exists = db.query(User).filter(User.api_key == "test-key-123").first()
+    if not exists:
+        test_user = User(api_key="test-key-123")
+        db.add(test_user)
+        db.commit()
+        print("Success: Created test user with API key: test-key-123")
+    else:
+        print("Test user already exists.")
+    db.close()
+
+if __name__ == "__main__":
+    seed()
+````
+
+## File: server/test_health.py
+````python
+import httpx
+import json
+
+BASE_URL = "http://localhost:8000"
+
+def test_health():
+    print("Testing Health Check...")
+    try:
+        response = httpx.get(f"{BASE_URL}/health")
+        print(f"Status: {response.status_code}")
+        print(f"Body: {response.json()}")
+    except Exception as e:
+        print(f"Error: {e}")
+
+if __name__ == "__main__":
+    test_health()
+````
+
+## File: src/app/component/sync/SyncStatusBadge.svelte
+````svelte
+<script>
+  import { syncStore } from "../../store/syncStore.svelte.js"
+  import { SYNC_PHASES } from "@/common/constants"
+
+  let syncMeta = $derived(syncStore.syncStatus)
+
+  const phaseConfig = {
+    [SYNC_PHASES.SYNCED]: {
+      label: "Synced",
+      icon: "fa-check",
+      class: "success",
+    },
+    [SYNC_PHASES.SYNCING]: {
+      label: "Syncing...",
+      icon: "fa-sync",
+      class: "syncing",
+    },
+    [SYNC_PHASES.AUTH_ERROR]: {
+      label: "Auth Failed",
+      icon: "fa-lock",
+      class: "error",
+    },
+    [SYNC_PHASES.OFFLINE]: {
+      label: "Offline",
+      icon: "fa-wifi",
+      class: "warning",
+    },
+    [SYNC_PHASES.SERVER_ERROR]: {
+      label: "Sync Error",
+      icon: "fa-exclamation-triangle",
+      class: "error",
+    },
+    [SYNC_PHASES.LOCAL_ONLY]: {
+      label: "Local Only",
+      icon: "fa-hdd",
+      class: "neutral",
+    },
+    [SYNC_PHASES.NEVER_SYNCED]: {
+      label: "Not Synced",
+      icon: "fa-circle",
+      class: "neutral",
+    },
+    [SYNC_PHASES.IDLE]: {
+      label: "Idle",
+      icon: "fa-circle",
+      class: "neutral",
+    },
+  }
+
+  let config = $derived(phaseConfig[syncMeta.phase] || phaseConfig[SYNC_PHASES.LOCAL_ONLY])
+  let isRetryVisible = $derived(
+    syncMeta.phase === SYNC_PHASES.AUTH_ERROR || syncMeta.phase === SYNC_PHASES.SERVER_ERROR
+  )
+</script>
+
+<div class={`sync-badge ${config.class}`} title={syncMeta.error?.message || config.label}>
+  <span class={`icon ${syncMeta.syncing ? "spin" : ""}`}>
+    <i class={`fas ${config.icon}`}></i>
+  </span>
+  <span class="label">{config.label}</span>
+  {#if syncMeta.pendingRetry}
+    <span class="retry-indicator" title="Retry scheduled">
+      <i class="fas fa-sync"></i>
+    </span>
+  {/if}
+</div>
+
+{#if isRetryVisible}
+  <button class="retry-btn" onclick={() => syncStore.manualRetry()}>
+    Retry Sync
+  </button>
+{/if}
+
+<style>
+  .sync-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+  }
+
+  .icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .icon.spin {
+    animation: spin 1s linear infinite;
+  }
+
+  .success {
+    background: rgba(64, 192, 87, 0.12);
+    border-color: rgba(64, 192, 87, 0.4);
+    color: #40c057;
+  }
+
+  .syncing {
+    background: rgba(77, 171, 247, 0.12);
+    border-color: rgba(77, 171, 247, 0.4);
+    color: #4dabf7;
+  }
+
+  .error {
+    background: rgba(250, 82, 82, 0.12);
+    border-color: rgba(250, 82, 82, 0.4);
+    color: #fa5252;
+  }
+
+  .warning {
+    background: rgba(255, 192, 120, 0.12);
+    border-color: rgba(255, 192, 120, 0.4);
+    color: #ffc078;
+  }
+
+  .neutral {
+    background: rgba(156, 163, 175, 0.12);
+    border-color: rgba(156, 163, 175, 0.4);
+    color: #9195a1;
+  }
+
+  .retry-indicator {
+    display: inline-flex;
+    align-items: center;
+    color: inherit;
+    opacity: 0.7;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+
+  .retry-btn {
+    margin-left: 12px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(250, 82, 82, 0.4);
+    background: transparent;
+    color: #fa5252;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .retry-btn:hover {
+    background: rgba(250, 82, 82, 0.1);
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 0.4;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+</style>
+````
+
+## File: src/app/index.css
+````css
+/* SquirrlTab Global Styles */
+/* Dark theme design system with cohesive aesthetics */
+
+:root {
+  /* Color Palette - Dark Theme */
+  --bg-primary: #141517;
+  --bg-secondary: #1a1b1e;
+  --bg-tertiary: #25262b;
+  --bg-elevated: #2c2e33;
+
+  --text-primary: #e4e4e7;
+  --text-secondary: #c1c2c5;
+  --text-tertiary: #909296;
+  --text-muted: #5c5f66;
+
+  --border-subtle: #2c2e33;
+  --border-default: #3c3e44;
+  --border-hover: #4c4e54;
+
+  /* Brand Colors */
+  --brand-primary: #ff922b;
+  --brand-secondary: #ff6b35;
+  --brand-gradient: linear-gradient(135deg, #ff922b 0%, #ff6b35 100%);
+
+  /* Semantic Colors */
+  --success: #40c057;
+  --error: #fa5252;
+  --warning: #ffc078;
+  --info: #4dabf7;
+  --purple: #7950f2;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.5);
+
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+
+  /* Typography */
+  --font-primary: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Reset & Base Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Typography */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+h1 {
+  font-size: 2rem;
+}
+
+h2 {
+  font-size: 1.5rem;
+}
+
+h3 {
+  font-size: 1.25rem;
+}
+
+h4 {
+  font-size: 1.125rem;
+}
+
+h5 {
+  font-size: 1rem;
+}
+
+h6 {
+  font-size: 0.875rem;
+}
+
+p {
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+/* Links */
+a {
+  color: var(--brand-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--brand-secondary);
+}
+
+/* Buttons */
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Inputs */
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+/* Focus Styles */
+*:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  transition: background var(--transition-base);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Selection */
+::selection {
+  background: rgba(255, 146, 43, 0.3);
+  color: var(--text-primary);
+}
+
+/* Utility Classes */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Animation Classes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Print Styles */
+@media print {
+  * {
+    background: white !important;
+    color: black !important;
+  }
+}
+
+/* Responsive Design Breakpoints */
+/* Mobile: < 640px */
+/* Tablet: 640px - 1024px */
+/* Desktop: > 1024px */
+
+@media (max-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 1024px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+/* Performance Optimizations */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Prevent text selection on UI elements */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Image optimization */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Improve performance of animations */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Dark mode specific adjustments */
+@media (prefers-color-scheme: dark) {
+  /* Already dark by default, but we can add overrides here if needed */
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border-subtle: #4c4e54;
+    --border-default: #5c5f66;
+  }
+}
+````
+
+## File: src/app/store/bridge.js
+````javascript
+import listManager from '@/common/listManager'
+import browser from 'webextension-polyfill'
+
+// Initialize the listManager for the frontend context
+listManager.init()
+
+/**
+ * Bridge function to handle listManager mutations in a Svelte-friendly way.
+ * This can be used by the Svelte stores to listen for changes from the background
+ * or other tabs.
+ */
+export const listenForChanges = (callback) => {
+  // Listen for 'refresh' messages from listManager (via sendMessage)
+  const listener = (message) => {
+    if (message.refresh || message.listModifed) {
+      callback(message)
+    }
+  }
+  browser.runtime.onMessage.addListener(listener)
+  return () => browser.runtime.onMessage.removeListener(listener)
+}
+
+export default listManager
+````
+
+## File: src/assets/css/index.css
+````css
+:root {
+  --primary-color: #3b82f6;
+  --primary-hover: #2563eb;
+  --bg-color: #f3f4f6;
+  --card-bg: #ffffff;
+  --text-main: #1f2937;
+  --text-secondary: #6b7280;
+  --border-color: #e5e7eb;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --transition-speed: 0.2s;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-family);
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn var(--transition-speed) ease-out;
+}
 ````
 
 ## File: src/assets/icons/icetab_old_favicon.svg
@@ -9582,6 +9745,89 @@ declare const listManager: ListManager
 export default listManager
 ````
 
+## File: src/common/logger.svelte.js
+````javascript
+let logs = $state([]);
+
+export const logger = {
+  get entries() { return logs; },
+
+  add(type, message, data = null) {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      type,
+      message,
+      data: data ? JSON.parse(JSON.stringify(data)) : null // snapshot
+    };
+    logs.push(entry);
+    if (logs.length > 100) logs.shift(); // keep it light
+
+    // Also log to console for dev
+    console[type === 'error' ? 'error' : 'log'](`[IceTab] ${message}`, data || '');
+  },
+
+  clear() {
+    logs = [];
+  },
+
+  // Bridge methods for compatibility with old logger
+  log(message, ...args) {
+    this.add('log', message, args.length > 0 ? args : null);
+  },
+  error(message, ...args) {
+    this.add('error', message, args.length > 0 ? args : null);
+  },
+  warn(message, ...args) {
+    // Map warn to log or error, or add specific type
+    this.add('warn', message, args.length > 0 ? args : null);
+  },
+  info(message, ...args) {
+    this.add('info', message, args.length > 0 ? args : null);
+  },
+  debug(message, ...args) {
+    // debug might be verbose, maybe optional?
+    this.add('debug', message, args.length > 0 ? args : null);
+  },
+  init() {
+    // No-op for compatibility
+  }
+};
+
+export default logger;
+````
+
+## File: src/common/sync-logger.js
+````javascript
+const MAX_LOG_ENTRIES = 100
+
+const logs = []
+
+export const logSyncEvent = (event, details = {}) => {
+  const entry = {
+    timestamp: Date.now(),
+    event,
+    ...details,
+  }
+
+  logs.push(entry)
+  if (logs.length > MAX_LOG_ENTRIES) {
+    logs.shift()
+  }
+
+  console.log(`[SyncLog] ${event}`, details)
+}
+
+export const getSyncLogs = () => [...logs]
+
+export const clearSyncLogs = () => {
+  logs.length = 0
+}
+
+export const exportSyncLogs = () => {
+  return JSON.stringify(logs, null, 2)
+}
+````
+
 ## File: src/common/tracker.js
 ````javascript
 let imported = false
@@ -9628,6 +9874,134 @@ main()
 </html>
 ````
 
+## File: src/mock/index.js
+````javascript
+// Basic Mock for Chrome Extension API
+const storage = {};
+
+const mockBrowser = {
+  runtime: {
+    getURL: (path) => window.location.origin + '/' + (path || ''),
+    id: 'mock-extension-id',
+    onMessage: { addListener: () => { } },
+    sendMessage: () => Promise.resolve(),
+    getManifest: () => ({ version: '0.0.0' }),
+  },
+  tabs: {
+    query: async () => {
+      // Return some dummy tabs
+      return [
+        { id: 1, title: 'Google', url: 'https://google.com', favIconUrl: 'https://www.google.com/favicon.ico', pinned: false, highlighted: true, windowId: 1 },
+        { id: 2, title: 'GitHub', url: 'https://github.com', favIconUrl: 'https://github.com/favicon.ico', pinned: false, highlighted: false, windowId: 1 },
+        { id: 3, title: 'Svelte', url: 'https://svelte.dev', favIconUrl: 'https://svelte.dev/favicon.png', pinned: true, highlighted: false, windowId: 1 },
+        { id: 4, title: 'Twitter', url: 'https://twitter.com', favIconUrl: '', pinned: false, highlighted: false, windowId: 1 },
+      ];
+    },
+    create: async (props) => {
+      console.log('Mock: Creating tab', props);
+      return { id: Math.floor(Math.random() * 1000), ...props };
+    },
+    update: async (id, props) => {
+      console.log('Mock: Updating tab', id, props);
+      return { id, ...props };
+    },
+    remove: async (ids) => {
+      console.log('Mock: Removing tabs', ids);
+    },
+    onActivated: { addListener: () => { } },
+    onUpdated: { addListener: () => { } },
+    onRemoved: { addListener: () => { } },
+    onMoved: { addListener: () => { } },
+  },
+  windows: {
+    getCurrent: async () => ({ id: 1 }),
+    getAll: async () => ([{ id: 1 }]),
+    create: async () => ({ id: 2, tabs: [] }),
+  },
+  storage: {
+    local: {
+      get: async (keys) => {
+        if (!keys) return storage;
+        if (typeof keys === 'string') keys = [keys];
+        const result = {};
+        if (Array.isArray(keys)) {
+          keys.forEach(k => result[k] = storage[k]);
+        } else {
+          // object with default values
+          Object.keys(keys).forEach(k => result[k] = storage[k] || keys[k]);
+        }
+        return JSON.parse(JSON.stringify(result)); // Deep clone
+      },
+      set: async (items) => {
+        Object.assign(storage, items);
+        // Persist to localStorage for DX
+        localStorage.setItem('mock_storage', JSON.stringify(storage));
+        // Trigger onChanged
+        if (mockBrowser.storage.onChanged.listeners) {
+          const changes = {};
+          Object.keys(items).forEach(k => {
+            changes[k] = { newValue: items[k] };
+          });
+          mockBrowser.storage.onChanged.listeners.forEach(l => l(changes, 'local'));
+        }
+      },
+      remove: async (keys) => {
+        if (typeof keys === 'string') keys = [keys];
+        keys.forEach(k => delete storage[k]);
+        localStorage.setItem('mock_storage', JSON.stringify(storage));
+      },
+      clear: async () => {
+        Object.keys(storage).forEach(key => delete storage[key]);
+        localStorage.removeItem('mock_storage');
+      }
+    },
+    onChanged: {
+      listeners: [],
+      addListener: (cb) => mockBrowser.storage.onChanged.listeners.push(cb),
+      removeListener: (cb) => {
+        mockBrowser.storage.onChanged.listeners = mockBrowser.storage.onChanged.listeners.filter(l => l !== cb);
+      }
+    }
+  },
+  i18n: {
+    getMessage: (key) => {
+      const messages = {
+        ui_my_tab_lists: 'My Tab Lists',
+        ui_clean_all: 'Clean All',
+        ui_tabs: 'Tabs',
+        ui_created: 'Created',
+        ui_untitled_list: 'Untitled List',
+        ui_unpin: 'Unpin',
+        ui_pin: 'Pin',
+        ui_restore_all: 'Restore All',
+        ui_nightmode: 'Night Mode',
+        ext_name: 'IceTab Dev',
+        ext_desc: 'Development Mode'
+      };
+      return messages[key] || key;
+    },
+    getUILanguage: () => 'en'
+  },
+  commands: {
+    getAll: async () => []
+  }
+};
+
+// Initialize storage from localStorage
+try {
+  const saved = localStorage.getItem('mock_storage');
+  if (saved) Object.assign(storage, JSON.parse(saved));
+} catch (e) {
+  console.warn('Failed to load mock storage', e);
+}
+
+// Expose globally
+window.browser = mockBrowser;
+window.chrome = mockBrowser;
+
+export default mockBrowser;
+````
+
 ## File: vue.config.js
 ````javascript
 const CopyWebpackPlugin = require('copy-webpack-plugin');
@@ -9650,23 +10024,48 @@ module.exports = {
 };
 ````
 
-## File: .babelrc
-````
-{
-  "presets": [
-    [
-      "@babel/preset-env",
-      {
-        "modules": false,
-        "targets": "last 1 years"
-      }
-    ]
-  ],
-  "plugins": [
-    "@babel/plugin-syntax-dynamic-import",
-    "lodash"
+## File: webpack.serve.js
+````javascript
+/* eslint-disable */
+const { merge } = require('webpack-merge')
+const common = require('./webpack.common.js')
+const path = require('path')
+const webpack = require('webpack')
+
+module.exports = merge(common, {
+  mode: 'development',
+  devtool: 'inline-source-map',
+  entry: {
+    // Only build the app entry point, inject mock before it
+    app: ['./src/mock/index.js', './src/app/index.js']
+  },
+  devServer: {
+    hot: true,
+    static: {
+      directory: path.join(__dirname, 'dist'),
+    },
+    compress: true,
+    port: 3000,
+    historyApiFallback: {
+      index: 'index.html'
+    },
+    devMiddleware: {
+      writeToDisk: false,
+    }
+  },
+  resolve: {
+    alias: {
+      // Redirect webextension-polyfill to our mock
+      'webextension-polyfill': path.resolve(__dirname, 'src/mock/index.js')
+    }
+  },
+  plugins: [
+    new webpack.NormalModuleReplacementPlugin(
+      /webextension-polyfill/,
+      path.resolve(__dirname, 'src/mock/index.js')
+    ),
   ]
-}
+})
 ````
 
 ## File: .gitignore
@@ -9820,6 +10219,25 @@ dist
 .pnp.*
 ````
 
+## File: config.js
+````javascript
+/* eslint-disable */
+module.exports = {
+  development: {
+    __CLIENT_ID__: '530831729511-eq8apt6dhjimbmdli90jp2ple0lfmn3l.apps.googleusercontent.com',
+    __DEV_CSP__: process.env.MOZ ? '' : ' http://localhost:8098 chrome-extension://nhdogjmejiglipccpnnnanhbledajbpd',
+    __EXT_NAME__: 'IceTab (dev)',
+    __CONTENT_SCRIPTS_MATCHES__: process.env.MOZ ? '*://*/*' : 'http://127.0.0.1:8000/*',
+  },
+  production: {
+    __CLIENT_ID__: '530831729511-dclgvblhv7var13mvpjochb5f295a6vc.apps.googleusercontent.com',
+    __DEV_CSP__: '',
+    __EXT_NAME__: '__MSG_ext_name__',
+    __CONTENT_SCRIPTS_MATCHES__: 'https://boss.cnwangjie.com/*',
+  }
+}
+````
+
 ## File: LICENSE
 ````
 MIT License
@@ -9846,145 +10264,840 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ````
 
-## File: src/app/component/main/detailList/ContextMenu.vue
-````vue
-<template>
-  <div>
-    <v-menu
-      :value="value"
-      :position-x="x"
-      :position-y="y"
-      min-width="200"
-      absolute
-      offset-y
-    >
-      <v-list dense>
-        <v-menu
-          offset-x
-          open-on-hover
-        >
-          <v-list-tile
-            slot="activator"
-            @click.stop="$emit('click', 'init')"
-          >
-            <v-list-tile-action>
-              <v-icon small>
-                move_to_inbox
-              </v-icon>
-            </v-list-tile-action>
-            <v-list-tile-content>
-              {{ __('ui_move_to') }}
-            </v-list-tile-content>
-            <v-list-tile-action>
-              <v-icon :style="{transform: 'rotate(-90deg)'}">
-                arrow_drop_down
-              </v-icon>
-            </v-list-tile-action>
-          </v-list-tile>
-          <v-list dense>
-            <v-list-tile
-              v-for="list in titledList"
-              :key="list.index"
-              :color="list.color"
-              @click.stop="$emit('click', 'moveSelectedItemsTo', list.index)"
-            >
-              <v-list-tile-title>{{ list.title }}</v-list-tile-title>
-            </v-list-tile>
-            <v-list-tile @click.stop="$emit('click', 'moveSelectedItemsTo', -1)">
-              <v-list-tile-title>
-                <v-icon small>
-                  create_new_folder
-                </v-icon>
-                {{ __('ui_a_new_list') }}
-              </v-list-tile-title>
-            </v-list-tile>
-          </v-list>
-        </v-menu>
+## File: server/database.py
+````python
+import datetime
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Boolean, text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
 
-        <v-divider class="my-1" />
+SQLALCHEMY_DATABASE_URL = "sqlite:///./icetab.db"
 
-        <v-list-tile @click.stop="$emit('click', 'openSelectedItems')">
-          <v-list-tile-action>
-            <v-icon small>
-              open_in_browser
-            </v-icon>
-          </v-list-tile-action>
-          <v-list-tile-content>
-            {{ __('ui_open') }}
-          </v-list-tile-content>
-        </v-list-tile>
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-        <v-list-tile @click.stop="$emit('click', 'duplicateSelectedItems')">
-          <v-list-tile-action>
-            <v-icon small>
-              content_copy
-            </v-icon>
-          </v-list-tile-action>
-          <v-list-tile-content>
-            {{ __('ui_duplicate') }}
-          </v-list-tile-content>
-        </v-list-tile>
+Base = declarative_base()
 
-        <v-list-tile @click.stop="$emit('click', 'copyLinksOfSelectedItems')">
-          <v-list-tile-action>
-            <v-icon small>
-              link
-            </v-icon>
-          </v-list-tile-action>
-          <v-list-tile-content>
-            {{ __('ui_copy_link') }}
-          </v-list-tile-content>
-        </v-list-tile>
+class User(Base):
+    __tablename__ = "users"
 
-        <v-list-tile @click.stop="$emit('click', 'copyTitleOfSelectedItems')">
-          <v-list-tile-action>
-            <v-icon small>
-              title
-            </v-icon>
-          </v-list-tile-action>
-          <v-list-tile-content>
-            {{ __('ui_copy_title') }}
-          </v-list-tile-content>
-        </v-list-tile>
+    id = Column(Integer, primary_key=True, index=True)
+    api_key = Column(String, unique=True, index=True)
+    last_synced_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    tab_lists = relationship("TabList", back_populates="user")
 
-        <v-divider class="my-1" />
+class TabList(Base):
+    __tablename__ = "tab_lists"
 
-        <v-list-tile @click.stop="$emit('click', 'removeSelectedItems')">
-          <v-list-tile-action>
-            <v-icon small>
-              delete
-            </v-icon>
-          </v-list-tile-action>
-          <v-list-tile-content>
-            {{ __('ui_remove') }}
-          </v-list-tile-content>
-        </v-list-tile>
-      </v-list>
-    </v-menu>
-  </div>
-</template>
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    remote_id = Column(String, index=True) # Extension's ID
+    title = Column(String)
+    tabs = Column(String)  # JSON string
+    category = Column(String)
+    tags = Column(String)  # JSON string
+    time = Column(Integer)
+    pinned = Column(Boolean, default=False)
+    color = Column(String)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
-<script>
-import { mapGetters } from 'vuex'
-import __ from '@/common/i18n'
+    user = relationship("User", back_populates="tab_lists")
 
-export default {
-  props: {
-    value: Boolean,
-  },
-  data() {
+def init_db():
+    Base.metadata.create_all(bind=engine)
+    ensure_columns()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def ensure_columns():
+    """Best-effort migration to add new sync-related columns without losing existing data."""
+    with engine.connect() as conn:
+        table_info = conn.execute(text("PRAGMA table_info('tab_lists')")).fetchall()
+        existing = {row[1] for row in table_info}
+        if "time" not in existing:
+            conn.execute(text("ALTER TABLE tab_lists ADD COLUMN time INTEGER"))
+        if "pinned" not in existing:
+            conn.execute(text("ALTER TABLE tab_lists ADD COLUMN pinned INTEGER DEFAULT 0"))
+        if "color" not in existing:
+            conn.execute(text("ALTER TABLE tab_lists ADD COLUMN color VARCHAR"))
+
+        user_info = conn.execute(text("PRAGMA table_info('users')")).fetchall()
+        user_cols = {row[1] for row in user_info}
+        if "last_synced_at" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN last_synced_at TEXT"))
+````
+
+## File: server/main.py
+````python
+import os
+import datetime
+from typing import List, Optional
+from fastapi import FastAPI, Depends, HTTPException, Security, Request
+from fastapi.security.api_key import APIKeyHeader
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+import json
+from openai import OpenAI
+from dotenv import load_dotenv
+import logging
+
+from database import init_db, get_db, User, TabList
+
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="SquirrlTab Sync API", version="2.0.0")
+
+# CORS Middleware - Allow all origins for development
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
+# Security
+API_KEY_NAME = "x-api-key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+# OpenAI Client (Optional for non-AI features)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+
+# Models
+class TabItem(BaseModel):
+    title: str
+    url: str
+    favIconUrl: Optional[str] = ""
+    pinned: Optional[bool] = False
+
+class TabListSchema(BaseModel):
+    remote_id: str
+    title: str
+    tabs: List[TabItem]
+    category: Optional[str] = None
+    tags: Optional[List[str]] = []
+    time: Optional[int] = None
+    pinned: Optional[bool] = False
+    color: Optional[str] = ""
+    updated_at: Optional[int] = None
+
+class CategorizeRequest(BaseModel):
+    tabs: List[TabItem]
+
+class FullSyncPayload(BaseModel):
+    lists: List[TabListSchema] = []
+
+def epoch_ms_to_dt(value: Optional[int]) -> datetime.datetime:
+    if value is None:
+        return datetime.datetime.utcnow()
+    return datetime.datetime.utcfromtimestamp(value / 1000)
+
+def dt_to_epoch_ms(value: Optional[datetime.datetime]) -> Optional[int]:
+    if value is None:
+        return None
+    return int(value.timestamp() * 1000)
+
+# Auth Dependency - with fallback for development
+def get_user_by_api_key(api_key: str = Security(api_key_header), db: Session = Depends(get_db)):
+    # If no API key provided, use default development user
+    if not api_key:
+        logger.warning("No API key provided, using default development user")
+        user = db.query(User).filter(User.username == "dev").first()
+        if not user:
+            # Create default dev user
+            user = User(username="dev", api_key="dev-key-12345")
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            logger.info("Created default development user")
+        return user
+    
+    user = db.query(User).filter(User.api_key == api_key).first()
+    if not user:
+        raise HTTPException(status_code=403, detail="Could not validate credentials")
+    return user
+
+@app.on_event("startup")
+def startup_event():
+    logger.info("Starting SquirrlTab Sync API...")
+    init_db()
+    logger.info("Database initialized")
+    
+    # Check for OpenAI API key
+    if OPENAI_API_KEY:
+        logger.info("OpenAI API key configured - AI features enabled")
+    else:
+        logger.warning("OpenAI API key not found - AI features disabled")
+
+@app.get("/")
+def root():
     return {
-      x: NaN, y: NaN, // menu position
+        "service": "SquirrlTab Sync API",
+        "version": "2.0.0",
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "sync_push": "/sync/push",
+            "sync_pull": "/sync/pull",
+            "sync_state": "/sync/state",
+            "ai_categorize": "/ai/categorize"
+        }
+    }
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "ok",
+        "time": datetime.datetime.utcnow().isoformat(),
+        "ai_enabled": OPENAI_API_KEY is not None
+    }
+
+@app.post("/sync/push")
+def push_tabs(data: TabListSchema, user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
+    try:
+        logger.info(f"Push request from user {user.username} for list {data.remote_id}")
+        updated_dt = epoch_ms_to_dt(data.updated_at or data.time)
+        
+        # Check if remote_id already exists for this user
+        existing = db.query(TabList).filter(
+            TabList.user_id == user.id, 
+            TabList.remote_id == data.remote_id
+        ).first()
+        
+        if existing:
+            existing.title = data.title
+            existing.tabs = json.dumps([t.dict() for t in data.tabs])
+            existing.category = data.category
+            existing.tags = json.dumps(data.tags) if data.tags else json.dumps([])
+            existing.time = data.time
+            existing.pinned = bool(data.pinned)
+            existing.color = data.color
+            existing.updated_at = updated_dt
+            logger.info(f"Updated existing list {data.remote_id}")
+        else:
+            new_list = TabList(
+                user_id=user.id,
+                remote_id=data.remote_id,
+                title=data.title,
+                tabs=json.dumps([t.dict() for t in data.tabs]),
+                category=data.category,
+                tags=json.dumps(data.tags) if data.tags else json.dumps([]),
+                time=data.time,
+                pinned=bool(data.pinned),
+                color=data.color,
+                updated_at=updated_dt
+            )
+            db.add(new_list)
+            logger.info(f"Created new list {data.remote_id}")
+        
+        user.last_synced_at = updated_dt
+        db.commit()
+        return {
+            "status": "success",
+            "remote_id": data.remote_id,
+            "updated_at": updated_dt.isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error pushing tabs: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/sync/pull")
+def pull_tabs(user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
+    try:
+        logger.info(f"Pull request from user {user.username}")
+        lists = db.query(TabList).filter(TabList.user_id == user.id).all()
+        result = []
+        for l in lists:
+            result.append({
+                "id": l.id,
+                "remote_id": l.remote_id,
+                "title": l.title,
+                "tabs": json.loads(l.tabs),
+                "category": l.category,
+                "tags": json.loads(l.tags) if l.tags else [],
+                "time": l.time,
+                "pinned": bool(l.pinned),
+                "color": l.color,
+                "updated_at": dt_to_epoch_ms(l.updated_at)
+            })
+        dataset_updated = user.last_synced_at or (max((l.updated_at for l in lists if l.updated_at), default=None))
+        logger.info(f"Returning {len(result)} lists")
+        return {
+            "lists": result,
+            "updated_at": dataset_updated.isoformat() if dataset_updated else None
+        }
+    except Exception as e:
+        logger.error(f"Error pulling tabs: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/sync/state")
+def replace_state(payload: FullSyncPayload, user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
+    try:
+        logger.info(f"Full sync request from user {user.username} with {len(payload.lists)} lists")
+        existing_lists = db.query(TabList).filter(TabList.user_id == user.id).all()
+        existing_map = {item.remote_id: item for item in existing_lists}
+        incoming_ids = set()
+        created = updated = 0
+        now_dt = datetime.datetime.utcnow()
+        incoming_timestamps = []
+
+        for entry in payload.lists:
+            incoming_ids.add(entry.remote_id)
+            updated_dt = epoch_ms_to_dt(entry.updated_at or entry.time)
+            incoming_timestamps.append(updated_dt)
+            tab_payload = json.dumps([t.dict() for t in entry.tabs])
+            tags_payload = json.dumps(entry.tags or [])
+
+            if entry.remote_id in existing_map:
+                row = existing_map[entry.remote_id]
+                row.title = entry.title
+                row.tabs = tab_payload
+                row.category = entry.category
+                row.tags = tags_payload
+                row.time = entry.time
+                row.pinned = bool(entry.pinned)
+                row.color = entry.color
+                row.updated_at = updated_dt
+                updated += 1
+            else:
+                new_row = TabList(
+                    user_id=user.id,
+                    remote_id=entry.remote_id,
+                    title=entry.title,
+                    tabs=tab_payload,
+                    category=entry.category,
+                    tags=tags_payload,
+                    time=entry.time,
+                    pinned=bool(entry.pinned),
+                    color=entry.color,
+                    updated_at=updated_dt,
+                )
+                db.add(new_row)
+                created += 1
+
+        deleted = 0
+        for row in existing_lists:
+            if row.remote_id not in incoming_ids:
+                db.delete(row)
+                deleted += 1
+
+        latest_ts = max(incoming_timestamps, default=now_dt)
+        user.last_synced_at = latest_ts
+        db.commit()
+
+        return {
+            "status": "success",
+            "created": created,
+            "updated": updated,
+            "deleted": deleted,
+            "updated_at": latest_ts.isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error during full sync: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/ai/categorize")
+def categorize_tabs(data: CategorizeRequest, user: User = Depends(get_user_by_api_key)):
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=503, detail="AI features not available - OpenAI API Key not configured")
+
+    try:
+        logger.info(f"AI categorize request from user {user.username} for {len(data.tabs)} tabs")
+        
+        prompt = f"""
+        Categorize these browser tabs into one high-level category (e.g., Shopping, Development, Research, Entertainment, Social, Work, Education).
+        Also provide 2-4 descriptive tags that would help organize these tabs.
+        
+        Tabs:
+        {json.dumps([t.dict() for t in data.tabs], indent=2)}
+        
+        Return ONLY valid JSON in this exact format:
+        {{
+            "category": "category name",
+            "tags": ["tag1", "tag2", "tag3"]
+        }}
+        """
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that categorizes browser tabs. Always return valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"}
+        )
+        
+        result = json.loads(response.choices[0].message.content)
+        logger.info(f"AI categorization successful: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"Error in AI categorization: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI categorization failed: {str(e)}")
+
+# Middleware to log all requests
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"{request.method} {request.url.path}")
+    response = await call_next(request)
+    logger.info(f"Response status: {response.status_code}")
+    return response
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+````
+
+## File: src/app/store/syncStore.svelte.js
+````javascript
+import browser from 'webextension-polyfill'
+import CustomSync, { SyncError } from '@/common/service/custom-sync'
+import storage from '@/common/storage'
+import { createNewTabList } from '@/common/list'
+import { SYNC_PHASES, RUNTIME_MESSAGES } from '@/common/constants'
+import { logSyncEvent } from '@/common/sync-logger'
+import tabsHelper from '@/common/tabs'
+import manager from './bridge'
+import _ from 'lodash'
+
+const RETRY_DELAY = 10000
+
+const getListTimestamp = list => list?.updatedAt || list?.time || 0
+const buildSignature = lists => (lists || []).map(list => `${list._id}:${getListTimestamp(list)}:${list.tabs?.length || 0}`).join('|')
+const computeVersion = lists => (lists || []).reduce((acc, list) => Math.max(acc, getListTimestamp(list)), 0)
+const parseRemoteVersion = value => {
+  if (!value) return 0
+  if (typeof value === 'number') return value
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+const mapRemoteList = remote =>
+  createNewTabList({
+    _id: remote.remote_id,
+    title: remote.title,
+    tabs: remote.tabs || [],
+    tags: remote.tags || [],
+    category: remote.category || '',
+    time: remote.time || Date.now(),
+    pinned: remote.pinned,
+    color: remote.color || '',
+    updatedAt: remote.updated_at || remote.time || Date.now(),
+  })
+
+let pendingPayload = null
+let retryTimer = null
+
+let state = $state({
+  lists: [],
+  opts: {},
+  aiLoading: null,
+  syncing: false,
+  snackbar: { status: false, msg: '' },
+  initialized: false,
+  lastSyncSuccess: null,
+  syncPhase: SYNC_PHASES.NEVER_SYNCED,
+  syncError: null,
+  localOnly: false,
+  lastSyncedAt: null,
+  lastSyncedSignature: '',
+  remoteVersion: 0,
+  pendingRetry: null,
+})
+
+const normalizeSyncError = error => {
+  if (error instanceof SyncError) {
+    const phaseMap = {
+      offline: SYNC_PHASES.OFFLINE,
+      auth: SYNC_PHASES.AUTH_ERROR,
+      server: SYNC_PHASES.SERVER_ERROR,
+    }
+    return {
+      code: error.code || 'unknown',
+      message: error.message,
+      status: error.status,
+      phase: phaseMap[error.code] || SYNC_PHASES.SERVER_ERROR,
+    }
+  }
+  return {
+    code: 'unknown',
+    message: error?.message || 'Unexpected sync failure',
+    status: null,
+    phase: SYNC_PHASES.SERVER_ERROR,
+  }
+}
+
+const scheduleRetry = () => {
+  if (!state.pendingRetry || retryTimer) return
+  logSyncEvent('retry_scheduled', {
+    delayMs: RETRY_DELAY,
+    reason: state.pendingRetry?.reason || 'unknown',
+  })
+  retryTimer = setTimeout(() => {
+    retryTimer = null
+    if (!state.pendingRetry) return
+    pendingPayload = state.pendingRetry
+    pushStateToServer(state.pendingRetry)
+  }, RETRY_DELAY)
+}
+
+const pushStateToServer = async payload => {
+  if (!payload) return
+  state.syncing = true
+  state.syncPhase = SYNC_PHASES.SYNCING
+  try {
+    const response = await CustomSync.syncState(payload.lists)
+    const remoteVersion = parseRemoteVersion(response?.updated_at) || computeVersion(payload.lists)
+    state.lastSyncedSignature = payload.signature
+    state.remoteVersion = remoteVersion
+    state.lastSyncedAt = Date.now()
+    state.lastSyncSuccess = true
+    state.syncPhase = SYNC_PHASES.SYNCED
+    state.syncError = null
+    state.localOnly = false
+    state.pendingRetry = null
+    pendingPayload = null
+    logSyncEvent('push_success', {
+      listCount: payload.lists?.length || 0,
+      signature: payload.signature,
+      reason: payload.reason,
+      remoteVersion,
+    })
+    if (retryTimer) {
+      clearTimeout(retryTimer)
+      retryTimer = null
+    }
+  } catch (error) {
+    const normalized = normalizeSyncError(error)
+    state.lastSyncSuccess = false
+    state.syncPhase = normalized.phase
+    state.syncError = normalized
+    state.localOnly = true
+    state.pendingRetry = payload
+    scheduleRetry()
+    logSyncEvent('push_failed', {
+      code: normalized.code,
+      phase: normalized.phase,
+      message: normalized.message,
+      listCount: payload?.lists?.length || 0,
+      reason: payload?.reason,
+    })
+    console.error('[SquirrlTab] Sync failed:', error)
+  } finally {
+    state.syncing = false
+  }
+}
+
+const debouncedPush = _.debounce(() => {
+  if (!pendingPayload) return
+  pushStateToServer(pendingPayload)
+}, 1200)
+
+const scheduleSync = (reason = 'change', { immediate = false, listsOverride = null, signatureOverride = null, force = false } = {}) => {
+  if (!state.initialized) return
+  const lists = listsOverride || $state.snapshot(state.lists)
+  const signature = signatureOverride || buildSignature(lists)
+  if (!force && signature === state.lastSyncedSignature) return
+  pendingPayload = { lists, signature, reason }
+  state.localOnly = true
+  if ([SYNC_PHASES.SYNCED, SYNC_PHASES.IDLE, SYNC_PHASES.NEVER_SYNCED].includes(state.syncPhase)) {
+    state.syncPhase = SYNC_PHASES.LOCAL_ONLY
+  }
+  if (immediate) {
+    debouncedPush.cancel()
+    pushStateToServer(pendingPayload)
+  } else {
+    debouncedPush()
+  }
+}
+
+const hydrateFromRemote = async () => {
+  state.syncing = true
+  state.syncPhase = SYNC_PHASES.SYNCING
+  logSyncEvent('hydrate_started')
+  try {
+    const response = await CustomSync.download()
+    const remoteLists = Array.isArray(response?.lists) ? response.lists : []
+    const normalizedRemote = remoteLists.map(mapRemoteList)
+    const remoteVersion = parseRemoteVersion(response?.updated_at) || computeVersion(normalizedRemote)
+    const localSnapshot = $state.snapshot(state.lists)
+    const localVersion = computeVersion(localSnapshot)
+    state.remoteVersion = remoteVersion
+
+    if (remoteVersion > localVersion) {
+      const signature = buildSignature(normalizedRemote)
+      state.lastSyncedSignature = signature
+      state.remoteVersion = remoteVersion
+      state.lastSyncSuccess = true
+      state.localOnly = false
+      state.syncError = null
+      await storage.setLists(normalizedRemote)
+      state.lastSyncedAt = Date.now()
+       state.syncPhase = SYNC_PHASES.SYNCED
+       logSyncEvent('hydrate_success', {
+         action: 'downloaded',
+         remoteLists: normalizedRemote.length,
+         localLists: localSnapshot.length,
+         remoteVersion,
+         localVersion,
+       })
+    } else if (localVersion > remoteVersion && localSnapshot.length) {
+      state.localOnly = true
+      state.syncPhase = SYNC_PHASES.LOCAL_ONLY
+      logSyncEvent('hydrate_success', {
+        action: 'upload_scheduled',
+        remoteLists: normalizedRemote.length,
+        localLists: localSnapshot.length,
+        remoteVersion,
+        localVersion,
+      })
+      scheduleSync('remote-behind', { immediate: true, listsOverride: localSnapshot, signatureOverride: buildSignature(localSnapshot) })
+    } else {
+      state.localOnly = false
+      state.syncPhase = SYNC_PHASES.SYNCED
+      logSyncEvent('hydrate_success', {
+        action: 'unchanged',
+        remoteLists: normalizedRemote.length,
+        localLists: localSnapshot.length,
+        remoteVersion,
+        localVersion,
+      })
+    }
+  } catch (error) {
+    const normalized = normalizeSyncError(error)
+    state.syncPhase = normalized.phase
+    state.syncError = normalized
+    state.lastSyncSuccess = false
+    state.localOnly = true
+    logSyncEvent('hydrate_failed', {
+      code: normalized.code,
+      phase: normalized.phase,
+      message: normalized.message,
+    })
+    console.error('[SquirrlTab] Failed to hydrate remote state:', error)
+  } finally {
+    state.syncing = false
+  }
+}
+
+const initStore = async (retries = 3) => {
+  let shouldFinalize = true
+  try {
+    const data = await browser.storage.local.get(['lists', 'opts'])
+    state.lists = Array.isArray(data.lists) ? data.lists : []
+    state.opts = data.opts || {}
+    state.lastSyncedSignature = buildSignature(state.lists)
+    state.remoteVersion = computeVersion(state.lists)
+    state.lastSyncSuccess = null
+    state.localOnly = false
+    state.syncError = null
+    state.syncPhase = SYNC_PHASES.IDLE
+  } catch (error) {
+    console.error('[SquirrlTab] Failed to initialize store:', error)
+    if (retries > 0) {
+      shouldFinalize = false
+      setTimeout(() => initStore(retries - 1), 500)
+      return
+    }
+    state.lists = []
+    state.opts = {}
+    state.lastSyncSuccess = false
+    state.localOnly = true
+    state.syncPhase = SYNC_PHASES.LOCAL_ONLY
+  } finally {
+    if (shouldFinalize) {
+      state.initialized = true
+      hydrateFromRemote()
+    }
+  }
+}
+
+initStore()
+
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') return
+  if (changes.lists) {
+    const newLists = changes.lists.newValue
+    state.lists = Array.isArray(newLists) ? newLists : []
+    console.log('[SquirrlTab] Lists updated from storage:', state.lists.length)
+  }
+  if (changes.opts) {
+    state.opts = changes.opts.newValue || {}
+    console.log('[SquirrlTab] Options updated from storage')
+  }
+})
+
+$effect.root(() => {
+  $effect(() => {
+    if (!state.initialized) return
+    const snapshot = $state.snapshot(state.lists)
+    const signature = buildSignature(snapshot)
+    scheduleSync('change', { listsOverride: snapshot, signatureOverride: signature })
+  })
+})
+
+export const syncStore = {
+  get lists() {
+    return state.lists
+  },
+  get opts() {
+    return state.opts
+  },
+  get aiLoading() {
+    return state.aiLoading
+  },
+  get syncing() {
+    return state.syncing
+  },
+  get snackbar() {
+    return state.snackbar
+  },
+  get initialized() {
+    return state.initialized
+  },
+  get lastSyncSuccess() {
+    return state.lastSyncSuccess
+  },
+  get syncStatus() {
+    return {
+      phase: state.syncPhase,
+      syncing: state.syncing,
+      error: state.syncError,
+      lastSyncedAt: state.lastSyncedAt,
+      localOnly: state.localOnly,
+      pendingRetry: Boolean(state.pendingRetry),
+      lastSyncSuccess: state.lastSyncSuccess,
     }
   },
-  computed: {
-    ...mapGetters(['titledList']),
+  updateSnackbar(payload) {
+    if (typeof payload === 'string') {
+      state.snackbar = { status: true, msg: payload }
+    } else {
+      state.snackbar = payload
+    }
   },
-  methods: {
-    __,
+  get pinnedLists() {
+    return state.lists.filter(list => list.pinned)
+  },
+  get taggedLists() {
+    const tagged = {}
+    state.lists.forEach(list => {
+      (list.tags || []).forEach(tag => {
+        if (!tagged[tag]) tagged[tag] = []
+        tagged[tag].push(list)
+      })
+    })
+    return tagged
+  },
+  async categorizeList(listId) {
+    const list = state.lists.find(l => l._id === listId)
+    if (!list) return
+
+    state.aiLoading = list._id
+    try {
+      const result = await CustomSync.AI.categorize(list.tabs)
+      if (result.category) {
+        manager.updateListById(list._id, { category: result.category })
+      }
+      if (result.tags) {
+        manager.updateListById(list._id, { tags: result.tags })
+      }
+      return result
+    } catch (error) {
+      console.error('[SquirrlTab] Categorization failed:', error)
+      throw error
+    } finally {
+      state.aiLoading = null
+    }
+  },
+  async restoreList(listId, inNewWindow = false) {
+    const list = state.lists.find(l => l._id === listId)
+    if (!list) {
+      console.warn('[SquirrlTab] Cannot restore list: not found', listId)
+      return false
+    }
+    try {
+      if (inNewWindow) await tabsHelper.restoreListInNewWindow(list)
+      else await tabsHelper.restoreTabs(list.tabs)
+      if (!list.pinned) {
+        await manager.removeListById(listId)
+      }
+      return true
+    } catch (error) {
+      console.error('[SquirrlTab] Failed to restore list:', error)
+      throw error
+    }
+  },
+  updateList(listId, updates) {
+    manager.updateListById(listId, updates)
+  },
+  removeList(listId) {
+    manager.removeListById(listId)
+  },
+  pinList(listId, pinned) {
+    manager.updateListById(listId, { pinned })
+  },
+  changeColor(listId, color) {
+    manager.updateListById(listId, { color })
+  },
+  manualRetry() {
+    const hadPending = Boolean(state.pendingRetry)
+    logSyncEvent('manual_retry', { hadPending })
+    if (state.pendingRetry) {
+      if (retryTimer) {
+        clearTimeout(retryTimer)
+        retryTimer = null
+      }
+      const payload = state.pendingRetry
+      state.pendingRetry = null
+      pushStateToServer(payload)
+      return
+    }
+    const snapshot = $state.snapshot(state.lists)
+    scheduleSync('manual-retry', {
+      immediate: true,
+      listsOverride: snapshot,
+      signatureOverride: buildSignature(snapshot),
+      force: true,
+    })
+  },
+  async cleanAll() {
+    const ids = state.lists.map(l => l._id)
+    for (const id of ids) {
+      manager.removeListById(id)
+    }
   },
 }
-</script>
+
+browser.runtime.onMessage.addListener(message => {
+  if (!message || !message.type) return
+  if (message.type === RUNTIME_MESSAGES.STASH_COMPLETED) {
+    syncStore.updateSnackbar('Current tab stashed')
+  }
+  if (message.type === RUNTIME_MESSAGES.STASH_FAILED) {
+    const reason = message.payload?.reason
+    const msg = reason === 'BLOCKED_URL'
+      ? 'Cannot stash the IceTab app itself'
+      : 'Unable to stash current tab'
+    syncStore.updateSnackbar(msg)
+  }
+})
 ````
 
 ## File: src/background/commandHandler.js
@@ -10011,54 +11124,130 @@ const commandHandler = command => {
 export default commandHandler
 ````
 
-## File: src/common/migrate.js
+## File: src/common/service/custom-sync.js
 ````javascript
+import storage from '../storage'
+import { SYNCED_LIST_PROPS } from '../constants'
 import _ from 'lodash'
-import { normalizeList } from './list'
-import logger from './logger.svelte.js'
-import { genObjectId, compareVersion } from './utils'
-import listManager from './listManager'
-import browser from 'webextension-polyfill'
 
-const migrations = {
-  '1.4.0': async () => {
-    // every list need an ID
-    const { lists } = await browser.storage.local.get('lists')
-    if (lists) {
-      const { 0: listsWithoutId, 1: listsWithId } = _.groupBy(lists.map(normalizeList), list => +!!list._id)
-      if (listsWithId) await browser.storage.local.set({ lists: listsWithId })
-
-      for (const list of listsWithoutId.reverse()) {
-        list._id = genObjectId()
-        await listManager.addList(list)
-      }
-    }
-    // remove deprecated storage keys
-    await browser.storage.local.remove(['conflict'])
+export class SyncError extends Error {
+  constructor(message, { code = 'unknown', status = null } = {}) {
+    super(message)
+    this.name = 'SyncError'
+    this.code = code
+    this.status = status
   }
 }
 
-const migrate = async () => {
-  const { version: dataVersion } = await browser.storage.local.get('version')
-  const { version: currentVersion } = browser.runtime.getManifest()
-  if (dataVersion === currentVersion) return
-  const sorted = Object.keys(migrations).sort(compareVersion)
-  for (const v of sorted) {
-    if (compareVersion(currentVersion, v) > 0) continue
-    try {
-      console.debug('[migrate] migrating:', v)
-      await migrations[v]()
-      await browser.storage.local.set({ version: v })
-      console.debug('[migrate] migrated to:', v)
-    } catch (err) {
-      logger.error('[migrate] migrate failed')
-      logger.error(err)
-      throw err
-    }
+const getSettings = async () => {
+  const opts = await storage.getOptions()
+  return {
+    baseUrl: opts.syncBaseUrl || 'http://localhost:8000',
+    apiKey: opts.syncApiKey || '',
   }
 }
 
-export default migrate
+const fetchData = async (path, method = 'GET', body = null) => {
+  const { baseUrl, apiKey } = await getSettings()
+  const url = `${baseUrl}${path}`
+  const headers = {
+    'x-api-key': apiKey,
+    'Content-Type': 'application/json',
+  }
+  const options = {
+    method,
+    headers,
+  }
+  if (body) {
+    options.body = JSON.stringify(body)
+  }
+
+  let response
+  try {
+    response = await fetch(url, options)
+  } catch (error) {
+    throw new SyncError('Unable to reach sync service', { code: 'offline' })
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    throw new SyncError('Invalid or missing sync credentials', { code: 'auth', status: response.status })
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    throw new SyncError(text || `Sync failed (${response.status})`, { code: 'server', status: response.status })
+  }
+
+  if (response.status === 204) return null
+  return response.json()
+}
+
+const serializeListForSync = list => {
+  const syncedData = _.pick(list, SYNCED_LIST_PROPS)
+  return {
+    remote_id: syncedData._id,
+    title: syncedData.title || '',
+    tabs: syncedData.tabs || [],
+    category: syncedData.category || '',
+    tags: syncedData.tags || [],
+    time: syncedData.time || Date.now(),
+    pinned: Boolean(syncedData.pinned),
+    color: syncedData.color || '',
+    updated_at: syncedData.updatedAt || syncedData.time || Date.now(),
+  }
+}
+
+export const upload = async list => {
+  const payload = serializeListForSync(list)
+  const response = await fetchData('/sync/push', 'POST', payload)
+  if (!response || response.status !== 'success') {
+    throw new SyncError('Server rejected push', { code: 'server' })
+  }
+  return response
+}
+
+export const syncState = async lists => {
+  const payload = {
+    lists: (lists || []).map(serializeListForSync),
+  }
+  const response = await fetchData('/sync/state', 'POST', payload)
+  if (!response || response.status !== 'success') {
+    throw new SyncError('Server rejected sync', { code: 'server' })
+  }
+  return response
+}
+
+export const download = async () => {
+  const data = await fetchData('/sync/pull', 'GET')
+  if (Array.isArray(data)) {
+    return { lists: data, updated_at: null }
+  }
+  return data
+}
+
+export const health = async () => {
+  const { baseUrl } = await getSettings()
+  const response = await fetch(`${baseUrl}/health`)
+  if (!response.ok) {
+    throw new SyncError(`Health check failed (${response.status})`, { code: 'server', status: response.status })
+  }
+  return response.json()
+}
+
+export const AI = {
+  categorize: async tabs => {
+    return fetchData('/ai/categorize', 'POST', { tabs })
+  },
+}
+
+export default {
+  upload,
+  syncState,
+  download,
+  health,
+  AI,
+  SyncError,
+}
 ````
 
 ## File: src/common/storage.js
@@ -10226,6 +11415,24 @@ module.exports = merge(common, {
 })
 ````
 
+## File: .babelrc
+````
+{
+  "presets": [
+    [
+      "@babel/preset-env",
+      {
+        "modules": false,
+        "targets": "last 1 years"
+      }
+    ]
+  ],
+  "plugins": [
+    "@babel/plugin-syntax-dynamic-import"
+  ]
+}
+````
+
 ## File: .circleci/config.yml
 ````yaml
 version: 2
@@ -10389,6 +11596,1956 @@ workflows:
               ignore: /.*/
 ````
 
+## File: .eslintrc.yml
+````yaml
+root: true
+env:
+  es6: true
+  browser: true
+  webextensions: true
+extends:
+  - eslint:recommended
+parserOptions:
+  parser: '@babel/eslint-parser'
+  sourceType: module
+  ecmaVersion: 2020
+  requireConfigFile: false
+  babelOptions:
+    plugins:
+      - "@babel/plugin-syntax-dynamic-import"
+rules:
+  no-console: 0
+globals:
+  DEBUG: readonly
+  PRODUCTION: readonly
+  MOZ: readonly
+  ga: readonly
+  $state: readonly
+  $effect: readonly
+  $derived: readonly
+  $props: readonly
+  $bindable: readonly
+  $inspect: readonly
+````
+
+## File: src/app/App.svelte
+````svelte
+<script>
+  import { syncStore } from "./store/syncStore.svelte.js";
+  import Drawer from "./component/main/Drawer.svelte";
+  import Toolbar from "./component/main/Toolbar.svelte";
+  import DetailList from "./page/main/DetailList.svelte";
+  import SettingsView from "./page/settings/SettingsView.svelte";
+  import Snackbar from "./component/main/Snackbar.svelte";
+
+  let drawerOpen = $state(false);
+  let activeView = $state("all");
+
+  function handleViewChange(view) {
+    activeView = view;
+    drawerOpen = false;
+  }
+</script>
+
+<div class="app">
+  <Toolbar
+    onToggleDrawer={() => (drawerOpen = !drawerOpen)}
+    onOpenSettings={() => {
+      activeView = "options";
+      drawerOpen = false;
+    }}
+  />
+
+  <Drawer bind:open={drawerOpen} onSetView={handleViewChange} />
+
+  <main class="main-content">
+    {#if activeView === "options"}
+      <SettingsView onBack={() => (activeView = "all")} />
+    {:else}
+      <DetailList {activeView} />
+    {/if}
+  </main>
+
+  <Snackbar />
+</div>
+
+<style>
+  :global(body) {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", Arial, sans-serif;
+    background: #141517;
+    color: #e4e4e7;
+    overflow: hidden;
+  }
+
+  :global(*) {
+    box-sizing: border-box;
+  }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: #141517;
+  }
+
+  .main-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* Custom Scrollbar */
+  :global(::-webkit-scrollbar) {
+    width: 8px;
+    height: 8px;
+  }
+
+  :global(::-webkit-scrollbar-track) {
+    background: transparent;
+  }
+
+  :global(::-webkit-scrollbar-thumb) {
+    background: #3c3e44;
+    border-radius: 4px;
+  }
+
+  :global(::-webkit-scrollbar-thumb:hover) {
+    background: #4c4e54;
+  }
+</style>
+````
+
+## File: src/app/component/main/Drawer.svelte
+````svelte
+<script>
+  import { syncStore } from "../../store/syncStore.svelte.js";
+  import { fade, fly } from "svelte/transition";
+  import { SYNC_PHASES } from "@/common/constants";
+  import { sendStashCurrentTabIntent } from "@/common/intents";
+  import { getRuntimeSource, isPopupContext } from "@/common/runtimeContext";
+
+  let { open = $bindable(false), onSetView } = $props();
+
+  const setView = (view) => {
+    if (onSetView) onSetView(view);
+    open = false;
+  };
+
+  let taggedLists = $derived(syncStore.taggedLists);
+  let syncMeta = $derived(syncStore.syncStatus);
+  let stashLoading = $state(false);
+  const runtimeSource = getRuntimeSource();
+  const popupContext = isPopupContext();
+
+  const formatSyncedTime = (timestamp) => {
+    if (!timestamp) return "";
+    return new Date(timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+
+  let statusLabel = $derived(() => {
+    if (syncMeta.syncing) return "Syncing...";
+    if (syncMeta.phase === SYNC_PHASES.OFFLINE) return "Offline mode";
+    if (syncMeta.phase === SYNC_PHASES.AUTH_ERROR) return "Sync auth required";
+    if (syncMeta.phase === SYNC_PHASES.SERVER_ERROR) return syncMeta.error?.message || "Sync failed";
+    if (syncMeta.phase === SYNC_PHASES.LOCAL_ONLY) return "Local changes pending";
+    if (syncMeta.phase === SYNC_PHASES.NEVER_SYNCED) return "Not synced yet";
+    if (syncMeta.lastSyncedAt) return `Synced ${formatSyncedTime(syncMeta.lastSyncedAt)}`;
+    return "Idle";
+  });
+
+  // Popup UI must never perform async tab, storage, or sync work; delegate via runtime messaging only.
+  const handleQuickStash = () => {
+    if (!popupContext || stashLoading) return;
+    stashLoading = true;
+    sendStashCurrentTabIntent(runtimeSource)
+      .catch((error) => {
+        console.error("[SquirrlTab] Failed to dispatch stash intent from popup:", error);
+      })
+      .finally(() => {
+        stashLoading = false;
+      });
+  };
+</script>
+
+{#if open}
+  <div
+    class="overlay"
+    role="button"
+    tabindex="0"
+    onclick={() => (open = false)}
+    onkeydown={(e) => e.key === "Escape" && (open = false)}
+    transition:fade={{ duration: 200 }}
+  ></div>
+
+  <aside class="drawer" transition:fly={{ x: -280, duration: 300, opacity: 1 }}>
+    <!-- Drawer Header -->
+    <header class="drawer-header">
+      <div class="logo-section">
+        <i class="fas fa-squirrel logo-icon"></i>
+        <div class="logo-text">
+          <span class="logo-title">SquirrlTab</span>
+          <span class="logo-subtitle">Winter Storage</span>
+        </div>
+      </div>
+    </header>
+
+    {#if popupContext}
+      <!-- Quick Actions -->
+      <section class="quick-actions">
+        <button class="action-btn primary" onclick={handleQuickStash} disabled={stashLoading}>
+          <i class={`fas ${stashLoading ? "fa-spinner fa-spin" : "fa-plus"}`}></i>
+          <span>{stashLoading ? "Stashing..." : "Stash This Tab"}</span>
+        </button>
+      </section>
+    {/if}
+
+    <!-- Navigation -->
+    <nav class="nav-section">
+      <ul class="nav-list">
+        <li>
+          <button class="nav-item" onclick={() => setView("all")}>
+            <i class="fas fa-th-large"></i>
+            <span>All Stashes</span>
+          </button>
+        </li>
+        <li>
+          <button class="nav-item" onclick={() => setView("pinned")}>
+            <i class="fas fa-thumbtack"></i>
+            <span>Pinned</span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="divider"></div>
+
+    <!-- Categories Section -->
+    <section class="categories-section">
+      <div class="section-header">
+        <span class="section-label">Categories</span>
+      </div>
+
+      <ul class="nav-list">
+        {#each Object.keys(taggedLists) as tag}
+          <li>
+            <button
+              class="nav-item category"
+              onclick={() => setView(`tag:${tag}`)}
+            >
+              <i class="fas fa-tag"></i>
+              <span>{tag}</span>
+              <span class="count">{taggedLists[tag].length}</span>
+            </button>
+          </li>
+        {:else}
+          <li class="empty-hint">
+            <i class="fas fa-info-circle"></i>
+            <span>No tags stashed yet</span>
+          </li>
+        {/each}
+      </ul>
+    </section>
+
+    <div class="spacer"></div>
+
+    <!-- Footer Section -->
+    <footer class="drawer-footer">
+      <button class="nav-item secondary" onclick={() => setView("options")}>
+        <i class="fas fa-cog"></i>
+        <span>Settings</span>
+      </button>
+
+    <div class="sync-status">
+      <div
+        class="status-indicator"
+        class:online={syncMeta.phase === SYNC_PHASES.SYNCED && !syncMeta.localOnly}
+        class:offline={syncMeta.phase === SYNC_PHASES.OFFLINE}
+        class:error={syncMeta.phase === SYNC_PHASES.SERVER_ERROR || syncMeta.phase === SYNC_PHASES.AUTH_ERROR}
+        class:syncing={syncMeta.syncing}
+        class:local={syncMeta.localOnly || syncMeta.phase === SYNC_PHASES.LOCAL_ONLY}
+      >
+        <span class="status-dot"></span>
+        <span class="status-text">{statusLabel}</span>
+      </div>
+    </div>
+  </footer>
+</aside>
+{/if}
+
+<style>
+  /* Overlay */
+  .overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+  }
+
+  /* Drawer */
+  .drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    background: #1a1b1e;
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+    border-right: 1px solid #2c2e33;
+  }
+
+  /* Drawer Header */
+  .drawer-header {
+    padding: 20px;
+    border-bottom: 1px solid #2c2e33;
+  }
+
+  .logo-section {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-icon {
+    color: #ff922b;
+    font-size: 1.75rem;
+    filter: drop-shadow(0 2px 4px rgba(255, 146, 43, 0.3));
+  }
+
+  .logo-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .logo-title {
+    font-weight: 700;
+    font-size: 1.125rem;
+    color: #e4e4e7;
+    letter-spacing: -0.02em;
+  }
+
+  .logo-subtitle {
+    font-size: 0.75rem;
+    color: #5c5f66;
+    font-weight: 500;
+  }
+
+  /* Quick Actions */
+  .quick-actions {
+    padding: 16px;
+  }
+
+  .action-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #ff922b 0%, #ff6b35 100%);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(255, 146, 43, 0.3);
+  }
+
+  .action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 146, 43, 0.4);
+  }
+
+  .action-btn:active {
+    transform: translateY(0);
+  }
+
+  /* Navigation */
+  .nav-section,
+  .categories-section,
+  .nav-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .nav-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: #c1c2c5;
+    font-size: 0.9rem;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .nav-item i {
+    width: 18px;
+    font-size: 0.9rem;
+    color: #5c5f66;
+    transition: all 0.2s;
+  }
+
+  .nav-item span {
+    flex: 1;
+  }
+
+  .nav-item:hover {
+    background: #25262b;
+    color: #e4e4e7;
+  }
+
+  .nav-item:hover i {
+    color: #909296;
+  }
+
+  .nav-item.category:hover i {
+    color: #ff922b;
+  }
+
+  .nav-item.secondary {
+    color: #909296;
+  }
+
+  .count {
+    background: #2c2e33;
+    color: #909296;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    min-width: 24px;
+    text-align: center;
+  }
+
+  /* Section Headers */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 12px 8px;
+  }
+
+  .section-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #5c5f66;
+    font-weight: 600;
+  }
+
+  .categories-section .section-label {
+    padding: 16px 12px 8px;
+  }
+
+  /* Empty Hint */
+  .empty-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    font-size: 0.8rem;
+    color: #5c5f66;
+    font-style: italic;
+  }
+
+  .empty-hint i {
+    font-size: 0.875rem;
+  }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: #2c2e33;
+    margin: 12px 16px;
+  }
+
+  /* Spacer */
+  .spacer {
+    flex: 1;
+  }
+
+  /* Footer */
+  .drawer-footer {
+    padding: 16px;
+    border-top: 1px solid #2c2e33;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .sync-status {
+    padding: 8px 12px;
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: #909296;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #5c5f66;
+    transition: all 0.3s;
+  }
+
+  .status-indicator.online .status-dot {
+    background: #40c057;
+    box-shadow: 0 0 8px rgba(64, 192, 87, 0.4);
+  }
+
+  .status-indicator.offline .status-dot {
+    background: #fa5252;
+    box-shadow: 0 0 8px rgba(250, 82, 82, 0.4);
+  }
+
+  .status-indicator.syncing {
+    color: #ff922b;
+  }
+
+  .status-indicator.error {
+    color: #fa5252;
+  }
+
+  .status-indicator.local .status-dot {
+    background: #ffa94d;
+    box-shadow: 0 0 8px rgba(255, 169, 77, 0.4);
+  }
+
+  .status-text {
+    font-weight: 500;
+  }
+</style>
+````
+
+## File: src/app/component/main/Snackbar.svelte
+````svelte
+<script>
+  import { syncStore } from "../../store/syncStore.svelte.js";
+  import { fade, fly } from "svelte/transition";
+
+  let snackbar = $derived(syncStore.snackbar || { status: false, msg: "" });
+
+  const close = () => {
+    syncStore.updateSnackbar({ status: false, msg: "" });
+  };
+
+  $effect(() => {
+    if (snackbar.status) {
+      const timer = setTimeout(close, 3000);
+      return () => clearTimeout(timer);
+    }
+  });
+</script>
+
+{#if snackbar.status}
+  <div class="snackbar" transition:fly={{ y: 20, duration: 300 }} role="alert">
+    <div class="snackbar-content">
+      <i class="fas fa-check-circle snackbar-icon"></i>
+      <span class="snackbar-message">{snackbar.msg}</span>
+      <button
+        class="snackbar-close"
+        onclick={close}
+        aria-label="Close notification"
+      >
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+  </div>
+{/if}
+
+<style>
+  .snackbar {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2000;
+    max-width: 500px;
+    width: calc(100% - 48px);
+  }
+
+  .snackbar-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(135deg, #1a1b1e 0%, #25262b 100%);
+    color: #e4e4e7;
+    padding: 16px 20px;
+    border-radius: 12px;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
+    border: 1px solid #2c2e33;
+  }
+
+  .snackbar-icon {
+    color: #40c057;
+    font-size: 1.125rem;
+  }
+
+  .snackbar-message {
+    flex: 1;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .snackbar-close {
+    background: transparent;
+    border: none;
+    color: #5c5f66;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .snackbar-close:hover {
+    background: #2c2e33;
+    color: #909296;
+  }
+</style>
+````
+
+## File: src/app/component/main/Toolbar.svelte
+````svelte
+<script>
+  import SyncStatusBadge from "../sync/SyncStatusBadge.svelte";
+
+  let { onToggleDrawer, onOpenSettings } = $props();
+</script>
+
+<nav class="toolbar">
+  <div class="toolbar-left">
+    <button class="menu-btn" onclick={onToggleDrawer} title="Open menu">
+      <i class="fas fa-bars"></i>
+    </button>
+
+    <div class="brand">
+      <i class="fas fa-squirrel brand-icon"></i>
+      <span class="brand-name">SquirrlTab</span>
+    </div>
+  </div>
+
+  <div class="toolbar-right">
+    <div class="sync-wrapper">
+      <SyncStatusBadge />
+    </div>
+
+    <button class="icon-btn" onclick={onOpenSettings} title="Settings">
+      <i class="fas fa-cog"></i>
+    </button>
+
+    <button class="icon-btn" title="More options">
+      <i class="fas fa-ellipsis-v"></i>
+    </button>
+  </div>
+</nav>
+
+<style>
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    background: #1a1b1e;
+    border-bottom: 1px solid #2c2e33;
+    padding: 0 16px;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .toolbar-left,
+  .toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .toolbar-left {
+    flex: 1;
+  }
+
+  /* Menu Button */
+  .menu-btn {
+    background: transparent;
+    border: none;
+    color: #909296;
+    cursor: pointer;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 1.125rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .menu-btn:hover {
+    background: #25262b;
+    color: #e4e4e7;
+  }
+
+  .menu-btn:active {
+    transform: scale(0.95);
+  }
+
+  /* Brand */
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .brand-icon {
+    color: #ff922b;
+    font-size: 1.25rem;
+  }
+
+  .brand-name {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #e4e4e7;
+    letter-spacing: -0.02em;
+  }
+
+  /* Icon Buttons */
+  .icon-btn {
+    background: transparent;
+    border: none;
+    color: #909296;
+    cursor: pointer;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .icon-btn:hover {
+    background: #25262b;
+    color: #e4e4e7;
+  }
+
+  .icon-btn:active {
+    transform: scale(0.95);
+  }
+
+  /* Sync Indicator */
+  .sync-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .brand-name {
+      display: none;
+    }
+
+  }
+</style>
+````
+
+## File: src/app/page/main/DetailList.svelte
+````svelte
+<script>
+  import { syncStore } from "../../store/syncStore.svelte.js";
+  import { fade, fly, slide } from "svelte/transition";
+  import browser from "webextension-polyfill";
+  import TagInput from "../../component/tags/TagInput.svelte";
+  import { sendStashCurrentTabIntent } from "@/common/intents";
+  import { getRuntimeSource, isPopupContext } from "@/common/runtimeContext";
+
+  let { activeView = "all" } = $props();
+
+  let isReady = $derived(syncStore.initialized);
+  let lists = $derived(syncStore.lists);
+  let sortMode = $state("newest");
+  const runtimeSource = getRuntimeSource();
+  const popupContext = isPopupContext();
+
+  // Load saved sort preference
+  $effect(() => {
+    browser.storage.local.get("sortPreference").then((data) => {
+      if (data.sortPreference) {
+        sortMode = data.sortPreference;
+      }
+    });
+  });
+
+  // Save sort preference when changed
+  $effect(() => {
+    if (sortMode === "newest") {
+      browser.storage.local.remove("sortPreference");
+      return;
+    }
+    browser.storage.local.set({ sortPreference: sortMode });
+  });
+  let filterQuery = $state("");
+  let expandedLists = $state(new Set());
+  let menuOpenFor = $state(null);
+  let emptyStashLoading = $state(false);
+  let aiLoading = $derived(syncStore.aiLoading);
+
+  const sortComparators = {
+    newest: (a, b) => (b.time || 0) - (a.time || 0),
+    oldest: (a, b) => (a.time || 0) - (b.time || 0),
+    aToZ: (a, b) => (a.title || "").localeCompare(b.title || ""),
+    zToA: (a, b) => (b.title || "").localeCompare(a.title || ""),
+  };
+
+  const matchFilter = (list) => {
+    if (!filterQuery.trim()) return true;
+    const needle = filterQuery.trim().toLowerCase();
+    const titleMatch = (list.title || "").toLowerCase().includes(needle);
+    const tagMatch = (list.tags || []).some((tag) => tag.toLowerCase().includes(needle));
+    return titleMatch || tagMatch;
+  };
+
+  let visibleLists = $derived(() => {
+    if (!isReady) return [];
+
+    let base = lists;
+    if (activeView === "pinned") {
+      base = syncStore.pinnedLists;
+    } else if (activeView.startsWith("tag:")) {
+      const tag = activeView.substring(4);
+      base = syncStore.taggedLists[tag] || [];
+    }
+    const filtered = base.filter(matchFilter);
+    const comparator = sortComparators[sortMode] || sortComparators.newest;
+    return [...filtered].sort(comparator);
+  });
+
+  let totalBeforeFilter = $derived(() => {
+    if (activeView === "pinned") return syncStore.pinnedLists.length;
+    if (activeView.startsWith("tag:")) {
+      const tag = activeView.substring(4);
+      return (syncStore.taggedLists[tag] || []).length;
+    }
+    return lists.length;
+  });
+
+  let isFiltered = $derived(() => filterQuery.trim().length > 0);
+  let filteredOutCount = $derived(() => totalBeforeFilter - visibleLists.length);
+
+  // Extract all unique tags from all lists for autocomplete
+  let allKnownTags = $derived(() => {
+    const tagSet = new Set();
+    lists.forEach((list) => {
+      (list.tags || []).forEach((tag) => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  });
+
+  function toggleExpand(listId) {
+    if (expandedLists.has(listId)) {
+      expandedLists.delete(listId);
+    } else {
+      expandedLists.add(listId);
+    }
+    expandedLists = new Set(expandedLists);
+  }
+
+  const interactiveHeaderSelector = "button, input, select, textarea, a";
+
+  function shouldIgnoreHeaderEvent(event) {
+    if (!event || !event.target) return false;
+    return Boolean(event.target.closest(interactiveHeaderSelector));
+  }
+
+  function handleHeaderClick(event, listId) {
+    if (shouldIgnoreHeaderEvent(event)) return;
+    toggleExpand(listId);
+  }
+
+  function handleHeaderKeydown(event, listId) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    toggleExpand(listId);
+  }
+
+  function toggleMenu(listId) {
+    menuOpenFor = menuOpenFor === listId ? null : listId;
+  }
+
+  function removeTab(listId, tabIndex) {
+    const list = lists.find((l) => l._id === listId);
+    if (!list) return;
+
+    const updatedTabs = list.tabs.filter((_, i) => i !== tabIndex);
+    if (updatedTabs.length === 0) {
+      syncStore.removeList(listId);
+    } else {
+      syncStore.updateList(listId, { tabs: updatedTabs });
+    }
+  }
+
+  async function handleRestore(list, inNewWindow = false) {
+    if (!list) return;
+    menuOpenFor = null;
+    if (!list.pinned) {
+      const confirmed = confirm(
+        `\u26A0\uFE0F This stash is NOT pinned.\n\n` +
+          `Restoring will:\n` +
+          `\u2713 Reopen all ${list.tabs?.length || 0} tabs\n` +
+          `\u2717 Delete this stash permanently\n\n` +
+          `Tip: Pin the stash first if you want to keep it.\n\n` +
+          `Continue with restore?`
+      );
+      if (!confirmed) return;
+    } else {
+      const confirmed = confirm(
+        `\uD83D\uDCCC This stash is pinned.\n\n` +
+          `Restoring will:\n` +
+          `\u2713 Reopen all ${list.tabs?.length || 0} tabs\n` +
+          `\u2713 Keep this stash for future use\n\n` +
+          `Continue?`
+      );
+      if (!confirmed) return;
+    }
+    const success = await syncStore.restoreList(list._id, inNewWindow);
+    if (success) {
+      syncStore.updateSnackbar(
+        list.pinned
+          ? "Tabs restored (stash kept because it is pinned)"
+          : "Tabs restored and stash cleared"
+      );
+    }
+  }
+
+  function handleDelete(list) {
+    if (!list) return;
+    menuOpenFor = null;
+    const confirmed = confirm("Delete this stash permanently?");
+    if (!confirmed) return;
+    syncStore.removeList(list._id);
+    syncStore.updateSnackbar("Stash deleted");
+  }
+
+  async function runAiCategorization(list) {
+    if (!list) return;
+    const confirmed = confirm(
+      "AI categorization will replace the current category and tags for this stash. Continue?"
+    );
+    if (!confirmed) return;
+    try {
+      await syncStore.categorizeList(list._id);
+      syncStore.updateSnackbar("AI suggestions applied");
+    } catch (error) {
+      syncStore.updateSnackbar("AI categorization failed");
+    } finally {
+      menuOpenFor = null;
+    }
+  }
+
+  function addTag(list, newTag) {
+    if (!list || !newTag) return;
+    const tags = Array.from(new Set([...(list.tags || []), newTag]));
+    syncStore.updateList(list._id, { tags });
+  }
+
+  function removeTag(list, tag) {
+    if (!list) return;
+    const tags = (list.tags || []).filter((t) => t !== tag);
+    syncStore.updateList(list._id, { tags });
+  }
+
+  // Popup UI dispatches stash intent only; background performs all tab and storage work.
+  function stashCurrentTabFromEmpty() {
+    if (!popupContext || emptyStashLoading) return;
+    emptyStashLoading = true;
+    sendStashCurrentTabIntent(runtimeSource)
+      .catch((error) => {
+        console.error("[SquirrlTab] Failed to dispatch stash intent from popup:", error);
+      })
+      .finally(() => {
+        emptyStashLoading = false;
+      });
+  }
+
+  function getViewTitle() {
+    if (activeView === "all") return "All Stashes";
+    if (activeView === "pinned") return "Pinned Stashes";
+    if (activeView.startsWith("tag:")) {
+      return `#${activeView.substring(4)}`;
+    }
+    return "Stashes";
+  }
+
+  $effect(() => {
+    const handleGlobalClick = () => {
+      if (menuOpenFor !== null) menuOpenFor = null;
+    };
+    document.addEventListener("click", handleGlobalClick);
+    return () => document.removeEventListener("click", handleGlobalClick);
+  });
+</script>
+
+{#if !isReady}
+  <div class="loading-container" transition:fade>
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <p class="loading-text">Gathering your acorns...</p>
+      <p class="loading-subtext">Preparing your winter store</p>
+    </div>
+  </div>
+{:else if visibleLists.length === 0}
+  <div class="empty-state" transition:fade>
+    <div class="empty-content">
+      <div class="empty-icon-wrapper">
+        <i class="fas fa-box-open empty-icon"></i>
+      </div>
+      <h2 class="empty-title">No stashes found</h2>
+      <p class="empty-description">
+        {#if activeView === "all"}
+          Start hoarding tabs for winter! Right-click any tab and select "Stash
+          This Tab"
+        {:else if activeView === "pinned"}
+          Pin important stashes to keep them easily accessible
+        {:else}
+          No stashes with this tag yet. Add tags to organize your collection
+        {/if}
+      </p>
+      {#if activeView === "all" && popupContext}
+        <button class="action-button" onclick={stashCurrentTabFromEmpty} disabled={emptyStashLoading}>
+          <i class={`fas ${emptyStashLoading ? "fa-spinner fa-spin" : "fa-plus"}`}></i>
+          <span>{emptyStashLoading ? "Stashing..." : "Stash Current Tab"}</span>
+        </button>
+      {/if}
+    </div>
+  </div>
+{:else}
+  <div class="lists-container">
+    <!-- View Header -->
+    <div class="view-header">
+      <div class="view-title">
+        <h1>{getViewTitle()}</h1>
+        <span class="stash-count">
+          {visibleLists.length}
+          {visibleLists.length === 1 ? "stash" : "stashes"}
+          {#if isFiltered && filteredOutCount > 0}
+            <span class="filter-indicator">
+              ({filteredOutCount} hidden by filter)
+            </span>
+          {/if}
+        </span>
+      </div>
+
+      <div class="view-actions">
+        <label class="sort-control">
+          <span class="control-label">Sort by</span>
+          <div class="sort-select">
+            <i class="fas fa-sort"></i>
+            <select bind:value={sortMode} aria-label="Sort stashes">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="aToZ">Title A → Z</option>
+              <option value="zToA">Title Z → A</option>
+            </select>
+          </div>
+        </label>
+        <div class="filter-input">
+          <i class="fas fa-filter"></i>
+          <input
+            type="text"
+            placeholder="Filter by title or tag"
+            bind:value={filterQuery}
+            aria-label="Filter stashes"
+          />
+          {#if filterQuery}
+            <button class="clear-filter" onclick={() => (filterQuery = "")} aria-label="Clear filter">
+              <i class="fas fa-times"></i>
+            </button>
+          {/if}
+        </div>
+        {#if isFiltered}
+          <button
+            class="clear-all-btn"
+            onclick={() => {
+              filterQuery = "";
+              sortMode = "newest";
+            }}
+            title="Reset sort and filter"
+          >
+            <i class="fas fa-redo"></i>
+            <span>Reset</span>
+          </button>
+        {/if}
+      </div>
+    </div>
+
+    <!-- Lists Grid -->
+    <div class="lists-grid">
+      {#each visibleLists as list (list._id)}
+        <div
+          class="stash-card"
+          transition:fly={{ y: 20, duration: 300, delay: 0 }}
+        >
+          <!-- Card Header -->
+          <div
+            class="card-header"
+            class:pinned={list.pinned}
+            role="button"
+            tabindex="0"
+            aria-expanded={expandedLists.has(list._id)}
+            aria-controls={`stash-panel-${list._id}`}
+            onclick={(event) => handleHeaderClick(event, list._id)}
+            onkeydown={(event) => handleHeaderKeydown(event, list._id)}
+          >
+            <button
+              class="expand-toggle"
+              type="button"
+              onclick={() => toggleExpand(list._id)}
+              aria-label={expandedLists.has(list._id) ? "Collapse" : "Expand"}
+            >
+              <i
+                class="fas fa-chevron-{expandedLists.has(list._id)
+                  ? 'down'
+                  : 'right'}"
+              ></i>
+            </button>
+
+            <div class="title-section">
+              <input
+                type="text"
+                class="stash-title"
+                value={list.title || "Untitled Stash"}
+                placeholder="Untitled Stash"
+                onblur={(e) =>
+                  syncStore.updateList(list._id, { title: e.target.value })}
+              />
+              <div class="meta-info">
+                <span class="tab-count">
+                  <i class="fas fa-file"></i>
+                  {list.tabs?.length || 0} tabs
+                </span>
+                {#if list.time}
+                  <span class="stash-date">
+                    <i class="fas fa-clock"></i>
+                    {new Date(list.time).toLocaleDateString()}
+                  </span>
+                {/if}
+              </div>
+            </div>
+
+            <div class="card-actions">
+              <button
+                class="card-btn pin"
+                class:pinned={list.pinned}
+                onclick={() => syncStore.pinList(list._id, !list.pinned)}
+                title={
+                  list.pinned
+                    ? "Unpin (stash will be deleted when restored)"
+                    : "Pin (stash will be kept after restore)"
+                }
+              >
+                <i class="fas fa-thumbtack"></i>
+              </button>
+
+              <button
+                class="card-btn"
+                onclick={() => handleRestore(list, false)}
+                title="Restores tabs and removes this stash unless it is pinned"
+              >
+                <i class="fas fa-folder-open"></i>
+              </button>
+
+              <div class="action-menu">
+                <button
+                  class="card-btn"
+                  title="More options"
+                  aria-haspopup="true"
+                  aria-expanded={menuOpenFor === list._id}
+                  onclick={(event) => {
+                    event.stopPropagation();
+                    toggleMenu(list._id);
+                  }}
+                >
+                  <i class="fas fa-ellipsis-v"></i>
+                </button>
+                {#if menuOpenFor === list._id}
+                  <div class="menu-panel">
+                    <button onclick={() => handleRestore(list, true)}>
+                      <i class="fas fa-clone"></i>
+                      Restore in new window
+                    </button>
+                    <!-- AI Categorization - deferred to v2
+                    <button
+                      onclick={() => runAiCategorization(list)}
+                      disabled={aiLoading === list._id}
+                      title="AI replaces the category and tags for this stash"
+                    >
+                      <i class={`fas ${aiLoading === list._id ? "fa-spinner fa-spin" : "fa-magic"}`}></i>
+                      {aiLoading === list._id ? "Categorizing..." : "AI Categorize"}
+                    </button>
+                    -->
+                    <button class="danger" onclick={() => handleDelete(list)}>
+                      <i class="fas fa-trash"></i>
+                      Delete stash
+                    </button>
+                  </div>
+                {/if}
+              </div>
+            </div>
+            {#if !list.pinned}
+              <p class="restore-hint">Restoring removes this stash unless it is pinned.</p>
+            {/if}
+          </div>
+
+          <!-- Card Content (Tabs) -->
+          {#if expandedLists.has(list._id)}
+            <div
+              id={`stash-panel-${list._id}`}
+              class="card-content"
+              transition:slide={{ duration: 300 }}
+            >
+              <div class="tabs-list">
+                {#each list.tabs || [] as tab, index (tab.url + index)}
+                  <div class="tab-row">
+                    <div class="tab-favicon">
+                      <img
+                        src={tab.favIconUrl ||
+                          "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%235c5f66' d='M8 0a8 8 0 100 16A8 8 0 008 0z'/%3E%3C/svg%3E"}
+                        alt=""
+                        onerror={(e) => (e.target.style.display = "none")}
+                      />
+                    </div>
+
+                    <a
+                      href={tab.url}
+                      class="tab-info"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={tab.title}
+                    >
+                      <span class="tab-title">{tab.title || tab.url}</span>
+                      <span class="tab-url">{new URL(tab.url).hostname}</span>
+                    </a>
+
+                    <button
+                      class="remove-tab"
+                      onclick={() => removeTab(list._id, index)}
+                      aria-label="Remove tab"
+                    >
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </div>
+                {/each}
+              </div>
+            </div>
+          {/if}
+
+          <div class="card-footer">
+            <div class="tags-container">
+              {#if list.tags && list.tags.length > 0}
+                {#each list.tags as tag}
+                  <span class="tag">
+                    {tag}
+                    <button
+                      class="remove-tag"
+                      title="Remove tag"
+                      onclick={() => removeTag(list, tag)}
+                    >
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </span>
+                {/each}
+              {:else}
+                <span class="tag muted">No tags yet</span>
+              {/if}
+            </div>
+            
+            <TagInput
+              existingTags={list.tags || []}
+              allKnownTags={allKnownTags}
+              onAdd={(tag) => addTag(list, tag)}
+              placeholder="Add a tag..."
+            />
+          </div>
+
+          <!-- Quick Preview (when collapsed) -->
+          {#if !expandedLists.has(list._id) && list.tabs && list.tabs.length > 0}
+            <div class="quick-preview">
+              {#each list.tabs.slice(0, 5) as tab}
+                <div class="preview-favicon" title={tab.title}>
+                  <img
+                    src={tab.favIconUrl ||
+                      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%235c5f66' d='M8 0a8 8 0 100 16A8 8 0 008 0z'/%3E%3C/svg%3E"}
+                    alt=""
+                  />
+                </div>
+              {/each}
+              {#if list.tabs.length > 5}
+                <span class="preview-more">+{list.tabs.length - 5}</span>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      {/each}
+    </div>
+  </div>
+{/if}
+
+<style>
+  /* Loading State */
+  .loading-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: #141517;
+  }
+
+  .loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid #2c2e33;
+    border-top-color: #ff922b;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .loading-text {
+    color: #e4e4e7;
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .loading-subtext {
+    color: #5c5f66;
+    font-size: 0.875rem;
+    margin: 0;
+  }
+
+  /* Empty State */
+  .empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 56px);
+    background: #141517;
+    padding: 40px 20px;
+  }
+
+  .empty-content {
+    text-align: center;
+    max-width: 480px;
+  }
+
+  .empty-icon-wrapper {
+    margin-bottom: 24px;
+  }
+
+  .empty-icon {
+    font-size: 80px;
+    color: #2c2e33;
+  }
+
+  .empty-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #e4e4e7;
+    margin: 0 0 12px 0;
+  }
+
+  .empty-description {
+    font-size: 0.95rem;
+    color: #909296;
+    line-height: 1.6;
+    margin: 0 0 32px 0;
+  }
+
+  .action-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 28px;
+    background: linear-gradient(135deg, #ff922b 0%, #ff6b35 100%);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(255, 146, 43, 0.3);
+  }
+
+  .action-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 146, 43, 0.4);
+  }
+
+  /* Lists Container */
+  .lists-container {
+    background: #141517;
+    min-height: calc(100vh - 56px);
+    padding: 32px;
+  }
+
+  /* View Header */
+  .view-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+  }
+
+  .view-title h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #e4e4e7;
+    margin: 0 0 4px 0;
+  }
+
+  .stash-count {
+    font-size: 0.875rem;
+    color: #5c5f66;
+    font-weight: 500;
+  }
+
+  .filter-indicator {
+    color: #ffc078;
+    font-weight: 500;
+    font-size: 0.8rem;
+    margin-left: 6px;
+  }
+
+  .view-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .sort-control {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .control-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #5c5f66;
+    font-weight: 600;
+  }
+
+  .sort-select {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #1a1b1e;
+    border: 1px solid #2c2e33;
+    border-radius: 10px;
+    padding: 8px 12px;
+  }
+
+  .sort-select select {
+    background: transparent;
+    border: none;
+    color: #e4e4e7;
+    font-size: 0.875rem;
+    appearance: none;
+  }
+
+  .filter-input {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #1a1b1e;
+    border: 1px solid #2c2e33;
+    border-radius: 10px;
+    min-width: 240px;
+  }
+
+  .filter-input input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #e4e4e7;
+    font-size: 0.875rem;
+    outline: none;
+  }
+
+  .clear-filter {
+    background: transparent;
+    border: none;
+    color: #5c5f66;
+    padding: 2px;
+    border-radius: 4px;
+    transition: color 0.2s;
+  }
+
+  .clear-filter:hover {
+    color: #e4e4e7;
+  }
+
+  .clear-all-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(255, 146, 43, 0.12);
+    border: 1px solid rgba(255, 146, 43, 0.3);
+    border-radius: 8px;
+    color: #ff922b;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .clear-all-btn:hover {
+    background: rgba(255, 146, 43, 0.2);
+    border-color: rgba(255, 146, 43, 0.5);
+  }
+
+  /* Lists Grid */
+  .lists-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 20px;
+  }
+
+  /* Stash Card */
+  .stash-card {
+    background: #1a1b1e;
+    border: 1px solid #2c2e33;
+    border-radius: 16px;
+    overflow: visible;
+    transition: all 0.3s;
+  }
+
+  .stash-card:hover {
+    border-color: #3c3e44;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+  }
+
+  /* Card Header */
+  .card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 20px;
+    background: linear-gradient(180deg, #1e1f23 0%, #1a1b1e 100%);
+    border-bottom: 1px solid #2c2e33;
+    position: relative;
+  }
+
+  .card-header.pinned {
+    border-left: 3px solid #ff922b;
+    padding-left: 17px;
+  }
+
+  .card-header.pinned::before {
+    content: "\01F4CC";
+    position: absolute;
+    left: 8px;
+    top: 12px;
+    font-size: 1rem;
+    opacity: 0.6;
+  }
+
+  .expand-toggle {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    color: #5c5f66;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    margin-top: 2px;
+  }
+
+  .expand-toggle:hover {
+    background: #25262b;
+    color: #909296;
+  }
+
+  .title-section {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .stash-title {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: #e4e4e7;
+    font-size: 1.125rem;
+    font-weight: 600;
+    padding: 4px 8px;
+    margin: -4px -8px 4px;
+    border-radius: 6px;
+    outline: none;
+    transition: all 0.2s;
+  }
+
+  .stash-title:hover {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .stash-title:focus {
+    background: #25262b;
+    box-shadow: 0 0 0 2px rgba(255, 146, 43, 0.2);
+  }
+
+  .meta-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 0.8125rem;
+    color: #5c5f66;
+  }
+
+  .meta-info span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .meta-info i {
+    font-size: 0.75rem;
+  }
+
+  .card-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .card-btn {
+    background: transparent;
+    border: none;
+    color: #5c5f66;
+    cursor: pointer;
+    padding: 8px 10px;
+    border-radius: 8px;
+    transition: all 0.2s;
+    font-size: 0.875rem;
+  }
+
+  .card-btn:hover {
+    background: #25262b;
+    color: #909296;
+  }
+
+  .card-btn.pin.pinned {
+    color: #ff922b;
+    background: rgba(255, 146, 43, 0.1);
+  }
+
+  .action-menu {
+    position: relative;
+  }
+
+  .menu-panel {
+    position: absolute;
+    top: 42px;
+    right: 0;
+    background: #1e1f23;
+    border: 1px solid #2c2e33;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    min-width: 190px;
+    padding: 8px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .menu-panel button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: transparent;
+    color: #c1c2c5;
+    font-size: 0.85rem;
+    transition: background 0.2s;
+    text-align: left;
+  }
+
+  .menu-panel button:hover {
+    background: #25262b;
+  }
+
+  .menu-panel button.danger {
+    color: #fa5252;
+  }
+
+  .restore-hint {
+    margin: 8px 20px 0;
+    font-size: 0.75rem;
+    color: #909296;
+  }
+
+  /* Card Content */
+  .card-content {
+    background: #141517;
+  }
+
+  .tabs-list {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .tab-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .tab-row:hover {
+    background: #1a1b1e;
+  }
+
+  .tab-favicon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #25262b;
+  }
+
+  .tab-favicon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .tab-info {
+    flex: 1;
+    min-width: 0;
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .tab-title {
+    color: #c1c2c5;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tab-url {
+    color: #5c5f66;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tab-info:hover .tab-title {
+    color: #e4e4e7;
+  }
+
+  .remove-tab {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    color: #3c3e44;
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: 6px;
+    opacity: 0;
+    transition: all 0.2s;
+  }
+
+  .tab-row:hover .remove-tab {
+    opacity: 1;
+  }
+
+  .remove-tab:hover {
+    background: rgba(250, 82, 82, 0.1);
+    color: #fa5252;
+  }
+
+  /* Card Footer */
+  .card-footer {
+    padding: 16px 20px;
+    border-top: 1px solid #2c2e33;
+    background: #141517;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tag {
+    background: #25262b;
+    color: #909296;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    border: 1px solid #2c2e33;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tag:hover {
+    background: #2c2e33;
+    color: #c1c2c5;
+    border-color: #3c3e44;
+  }
+
+  .tag.muted {
+    opacity: 0.7;
+  }
+
+  .remove-tag {
+    background: transparent;
+    border: none;
+    color: #5c5f66;
+    padding: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .remove-tag:hover {
+    color: #fa5252;
+  }
+
+  /* Quick Preview */
+  .quick-preview {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 20px;
+    background: #141517;
+    border-top: 1px solid #2c2e33;
+  }
+
+  .preview-favicon {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #25262b;
+    border: 1px solid #2c2e33;
+  }
+
+  .preview-favicon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .preview-more {
+    font-size: 0.75rem;
+    color: #5c5f66;
+    font-weight: 600;
+    margin-left: 4px;
+  }
+
+  /* Responsive */
+  @media (max-width: 1200px) {
+    .lists-grid {
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    }
+  }
+
+  @media (max-width: 768px) {
+    .lists-container {
+      padding: 20px 16px;
+    }
+
+    .lists-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .view-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 16px;
+    }
+  }
+</style>
+````
+
 ## File: src/background/installedEventHandler.js
 ````javascript
 import __ from '../common/i18n'
@@ -10416,6 +13573,138 @@ const installedEventHandler = detail => {
 }
 
 export default installedEventHandler
+````
+
+## File: src/common/exchange.js
+````javascript
+import _ from 'lodash'
+import moment from 'moment'
+import download from 'downloadjs'
+import list from './list'
+import storage from './storage'
+
+const importFromText = (compatible, data) => new Promise((resolve, reject) => {
+  const exchanger = new Worker('exchanger.js')
+  exchanger.addEventListener('message', e => {
+    if (!e.data || e.data.length == null) return
+    exchanger.terminate()
+    const lists = e.data.map(list.createNewTabList)
+    resolve(lists)
+  })
+  exchanger.addEventListener('error', reject)
+  exchanger.postMessage({compatible, data})
+})
+
+const exportToText = async compatible => {
+  const lists = await storage.getLists()
+  if (compatible) return lists.map(list => list.tabs.map(tab => tab.url + ' | ' + tab.title).join('\n')).join('\n\n')
+  return JSON.stringify(lists.map(i => _.pick(i, ['tabs', 'title', 'time', 'tags', 'expand', 'pinned'])), null, 4)
+}
+
+const exportToFile = (text, {type, suffix}) => {
+  const name = 'IceTab_backup_' + moment().format('L') + suffix
+  const blob = new Blob(['\ufeff' + text], {type})
+  download(blob, name, type)
+}
+
+const types = {
+  JSON: { type: 'application/json; charset=utf-8', suffix: '.json' },
+  TEXT: { type: 'plain/text; charset=utf-8', suffix: '.txt' },
+}
+
+export default {
+  importFromText,
+  exportToText,
+  exportToFile,
+  types,
+}
+````
+
+## File: src/common/list.js
+````javascript
+import _ from 'lodash'
+import { genObjectId } from './utils'
+import { normalizeTab } from './tab'
+import { PICKED_LIST_RPOPS } from './constants'
+
+export const createNewTabList = ({ _id, tabs, title, tags, category, time, pinned, expand, color, updatedAt }) => ({
+  _id: _id || genObjectId(),
+  tabs: Array.isArray(tabs) ? tabs.map(normalizeTab) : [],
+  title: title || '',
+  tags: tags || [],
+  category: category || '',
+  time: time || Date.now(),
+  titleEditing: false,
+  pinned: pinned === true, // default is false
+  expand: expand !== false, // default is true
+  color: color || '',
+  updatedAt: updatedAt || time || Date.now(),
+})
+
+export const validateList = list => list != null && Array.isArray(list.tabs)
+
+// Preserving the needed properties before store lists.
+export const normalizeList = list => {
+  // If a list has no _id, assign a new one.
+  if (!list._id) {
+    list._id = genObjectId()
+  }
+  const normalizedList = _.pick(list, PICKED_LIST_RPOPS)
+  normalizedList.tabs = normalizedList.tabs.map(normalizeTab)
+  return normalizedList
+}
+
+export default { createNewTabList, normalizeList, validateList }
+````
+
+## File: src/common/migrate.js
+````javascript
+import _ from 'lodash'
+import { normalizeList } from './list'
+import logger from './logger.svelte.js'
+import { genObjectId, compareVersion } from './utils'
+import listManager from './listManager'
+import browser from 'webextension-polyfill'
+
+const migrations = {
+  '1.4.0': async () => {
+    // every list need an ID
+    const { lists } = await browser.storage.local.get('lists')
+    if (lists) {
+      const { 0: listsWithoutId, 1: listsWithId } = _.groupBy(lists.map(normalizeList), list => +!!list._id)
+      if (listsWithId) await browser.storage.local.set({ lists: listsWithId })
+
+      for (const list of listsWithoutId.reverse()) {
+        list._id = genObjectId()
+        await listManager.addList(list)
+      }
+    }
+    // remove deprecated storage keys
+    await browser.storage.local.remove(['conflict'])
+  }
+}
+
+const migrate = async () => {
+  const { version: dataVersion } = await browser.storage.local.get('version')
+  const { version: currentVersion } = browser.runtime.getManifest()
+  if (dataVersion === currentVersion) return
+  const sorted = Object.keys(migrations).sort(compareVersion)
+  for (const v of sorted) {
+    if (compareVersion(currentVersion, v) > 0) continue
+    try {
+      console.debug('[migrate] migrating:', v)
+      await migrations[v]()
+      await browser.storage.local.set({ version: v })
+      console.debug('[migrate] migrated to:', v)
+    } catch (err) {
+      logger.error('[migrate] migrate failed')
+      logger.error(err)
+      throw err
+    }
+  }
+}
+
+export default migrate
 ````
 
 ## File: src/common/service/gdrive.js
@@ -10535,6 +13824,35 @@ const gdrive = {
 if (DEBUG) window.gdrive = gdrive
 
 export default gdrive
+````
+
+## File: src/exchanger.js
+````javascript
+const parseLists = (compatible, data) => {
+  const lists = compatible ? data.split('\n\n')
+    .filter(i => i.trim())
+    .map(i => i.split('\n')
+      .filter(j => j)
+      .map(j => {
+        const [url, ...title] = j.split('|')
+        return {
+          url: url.trim(),
+          title: title.join().trim(),
+        }
+      }))
+    .map(tabs => ({tabs}))
+    : JSON.parse(data)
+
+  return lists
+}
+
+addEventListener('message', msg => {
+  const {compatible, data} = msg.data
+  if (compatible == null || !data) throw new Error('wrong message')
+  const listsData = parseLists(compatible, data)
+  if (!Array.isArray(listsData)) throw new Error('data must be an array')
+  postMessage(listsData)
+})
 ````
 
 ## File: webpack.prod.js
@@ -10814,8 +14132,62 @@ import {sendMessage} from '../common/utils'
 import listManager from '../common/listManager'
 import {setupContextMenus} from './contextMenus'
 import {updateBrowserAction} from './browserAction'
+import browser from 'webextension-polyfill'
+import {ILLEGAL_URLS, RUNTIME_MESSAGES} from '../common/constants'
+
+const getExtensionUrlPrefix = () => browser.runtime.getURL('')
+
+const isBlockedStashTarget = url => {
+  if (!url) return true
+  const extensionUrl = getExtensionUrlPrefix()
+  if (url.startsWith(extensionUrl)) return true
+  return ILLEGAL_URLS.some(prefix => url.startsWith(prefix))
+}
+
+const emitStashEvent = (type, payload) => {
+  return browser.runtime.sendMessage({
+    type,
+    payload,
+  }).catch(() => {
+    // It's fine if no UI is listening.
+  })
+}
+
+const handleStashCurrentTabIntent = async (source = 'app') => {
+  try {
+    const [activeTab] = await browser.tabs.query({active: true, currentWindow: true})
+    if (!activeTab || !activeTab.id) {
+      throw new Error('NO_ACTIVE_TAB')
+    }
+    if (isBlockedStashTarget(activeTab.url)) {
+      throw new Error('BLOCKED_URL')
+    }
+    await tabs.storeCurrentTab()
+    await emitStashEvent(RUNTIME_MESSAGES.STASH_COMPLETED, {
+      source,
+      tabId: activeTab.id,
+      title: activeTab.title,
+      url: activeTab.url,
+    })
+  } catch (error) {
+    await emitStashEvent(RUNTIME_MESSAGES.STASH_FAILED, {
+      source,
+      reason: error.message || 'UNKNOWN',
+    })
+    console.error('[SquirrlTab] Failed to stash current tab intent:', error)
+  }
+}
 
 const messageHandler = async msg => {
+  if (!msg) return
+  if (msg.type === RUNTIME_MESSAGES.STASH_COMPLETED || msg.type === RUNTIME_MESSAGES.STASH_FAILED) {
+    return
+  }
+  if (msg.type === RUNTIME_MESSAGES.STASH_CURRENT_TAB) {
+    const source = msg.payload?.source || 'app'
+    handleStashCurrentTabIntent(source)
+    return
+  }
   console.debug('received', msg)
   if (msg.optionsChanged) {
     const changes = msg.optionsChanged
@@ -10863,394 +14235,6 @@ const messageHandler = async msg => {
 }
 
 export default messageHandler
-````
-
-## File: src/common/list.js
-````javascript
-import _ from 'lodash'
-import { genObjectId } from './utils'
-import { normalizeTab } from './tab'
-import { PICKED_LIST_RPOPS } from './constants'
-
-export const createNewTabList = ({ _id, tabs, title, tags, category, time, pinned, expand, color, updatedAt }) => ({
-  _id: _id || genObjectId(),
-  tabs: Array.isArray(tabs) ? tabs.map(normalizeTab) : [],
-  title: title || '',
-  tags: tags || [],
-  category: category || '',
-  time: time || Date.now(),
-  titleEditing: false,
-  pinned: pinned === true, // default is false
-  expand: expand !== false, // default is true
-  color: color || '',
-  updatedAt: updatedAt || time || Date.now(),
-})
-
-export const validateList = list => list != null && Array.isArray(list.tabs)
-
-// Preserving the needed properties before store lists.
-export const normalizeList = list => {
-  // If a list has no _id, assign a new one.
-  if (!list._id) {
-    list._id = genObjectId()
-  }
-  const normalizedList = _.pick(list, PICKED_LIST_RPOPS)
-  normalizedList.tabs = normalizedList.tabs.map(normalizeTab)
-  return normalizedList
-}
-
-export default { createNewTabList, normalizeList, validateList }
-````
-
-## File: src/common/options.js
-````javascript
-import _ from 'lodash'
-import __ from '@/common/i18n'
-
-const cate = {
-  BEHAVIOUR: 'behaviour',
-  APPEARANCE: 'appearance',
-  PERFOREMANCE: 'performance',
-}
-
-export const getOptionsList = () => [
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'browserAction',
-    type: String,
-    default: 'show-list',
-    items: [
-      {
-        value: 'popup',
-        label: __('opt_label_popup'),
-      },
-      {
-        value: 'store-selected',
-        label: __('opt_label_store_selected'),
-      },
-      {
-        value: 'store-all',
-        label: __('opt_label_store_all'),
-      },
-      {
-        value: 'show-list',
-        label: __('opt_label_show_list'),
-      },
-      {
-        value: 'none',
-        label: __('opt_label_none'),
-      },
-    ],
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'itemClickAction',
-    type: String,
-    default: 'open-and-remove',
-    items: [
-      {
-        value: 'open-and-remove',
-        label: __('opt_label_open_and_remove'),
-      },
-      {
-        value: 'open',
-        label: __('opt_label_open'),
-      },
-      {
-        value: 'none',
-        label: __('opt_label_none'),
-      },
-    ],
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'popupItemClickAction',
-    type: String,
-    default: 'restore',
-    items: [
-      {
-        value: 'restore',
-        label: __('opt_label_restore'),
-      },
-      {
-        value: 'restore-new-window',
-        label: __('opt_label_restore_new_window'),
-      },
-      {
-        value: 'none',
-        label: __('opt_label_none'),
-      },
-    ],
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'removeItemBtnPos',
-    type: String,
-    default: 'left',
-    items: [
-      {
-        value: 'left',
-        label: __('opt_label_left'),
-      },
-      {
-        value: 'right',
-        label: __('opt_label_right'),
-      },
-    ],
-    deprecated: '1.4',
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'defaultNightMode',
-    type: Boolean,
-    default: false,
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'itemDisplay',
-    type: String,
-    default: 'title-and-url',
-    items: [
-      {
-        value: 'title-and-url',
-        label: __('opt_label_title_and_url'),
-      },
-      {
-        value: 'title',
-        label: __('opt_label_title'),
-      },
-      {
-        value: 'url',
-        label: __('opt_label_url'),
-      },
-    ],
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'hideFavicon',
-    type: Boolean,
-    default: false,
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'fixedToolbar',
-    type: Boolean,
-    default: false,
-    deprecated: '1.4',
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'addHistory',
-    type: Boolean,
-    default: true,
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'ignorePinned',
-    type: Boolean,
-    default: false,
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'pinNewList',
-    type: Boolean,
-    default: false,
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'pageContext',
-    type: Boolean,
-    default: true,
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'allContext',
-    type: Boolean,
-    default: false,
-    deps: ({ pageContext }) => pageContext,
-    new: '1.3.6',
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'openTabListWhenNewTab',
-    desc: true,
-    deps: ({ disableDynamicMenu }) => !disableDynamicMenu,
-    type: Boolean,
-    default: false,
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'alertRemoveList',
-    type: Boolean,
-    default: false,
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'excludeIllegalURL',
-    type: Boolean,
-    default: true,
-    new: '1.3.6',
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'removeDuplicate',
-    type: Boolean,
-    default: false,
-    new: '1.3.6',
-  },
-  // START - Comment out Boss sync options
-  /*
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'useBoss',
-    type: Boolean,
-    default: false,
-    new: '1.3.0',
-    desc: true,
-  },
-  */
-  // END - Comment out Boss sync options
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'syncBaseUrl',
-    type: String,
-    default: 'http://localhost:8000',
-    new: '1.4.1',
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'syncApiKey',
-    type: String,
-    default: '',
-    new: '1.4.1',
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'enableSearch',
-    type: Boolean,
-    default: true,
-    new: '1.3.7',
-    deprecated: '1.4',
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'openEnd',
-    type: Boolean,
-    default: true,
-    new: '1.3.9',
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'openTabListNoTab',
-    type: Boolean,
-    default: true,
-    new: '1.4.0',
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'listsPerPage',
-    type: String,
-    default: 10,
-    items: [
-      {
-        value: 5,
-        label: 5,
-      },
-      {
-        value: 10,
-        label: 10,
-      },
-      {
-        value: 15,
-        label: 15,
-      },
-    ],
-    new: '1.4.0',
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'titleFontSize',
-    type: String,
-    default: '12px',
-    items: [
-      {
-        value: '12px',
-        label: '12px',
-      },
-      {
-        value: '18px',
-        label: '18px',
-      },
-      {
-        value: '24px',
-        label: '24px',
-      },
-    ],
-    new: '1.4.0',
-  },
-  {
-    cate: cate.PERFOREMANCE,
-    name: 'disableDynamicMenu',
-    type: Boolean,
-    default: false,
-    new: '1.4.0',
-  },
-  {
-    cate: cate.PERFOREMANCE,
-    name: 'disableExpansion',
-    type: Boolean,
-    default: false,
-    new: '1.4.0',
-  },
-  {
-    cate: cate.PERFOREMANCE,
-    name: 'disableTransition',
-    type: Boolean,
-    default: false,
-    new: '1.4.0',
-  },
-  {
-    cate: cate.PERFOREMANCE,
-    name: 'disableSearch',
-    type: Boolean,
-    default: false,
-    new: '1.4.0',
-  },
-].filter(i => !i.deprecated)
-
-const _defaultOptions = _.mapValues(_.keyBy(getOptionsList(), 'name'), i => i.default)
-const getDefaultOptions = () => _defaultOptions
-
-export default { getDefaultOptions, getOptionsList }
-````
-
-## File: src/exchanger.js
-````javascript
-const parseLists = (compatible, data) => {
-  const lists = compatible ? data.split('\n\n')
-    .filter(i => i.trim())
-    .map(i => i.split('\n')
-      .filter(j => j)
-      .map(j => {
-        const [url, ...title] = j.split('|')
-        return {
-          url: url.trim(),
-          title: title.join().trim(),
-        }
-      }))
-    .map(tabs => ({tabs}))
-    : JSON.parse(data)
-
-  return lists
-}
-
-addEventListener('message', msg => {
-  const {compatible, data} = msg.data
-  if (compatible == null || !data) throw new Error('wrong message')
-  const listsData = parseLists(compatible, data)
-  if (!Array.isArray(listsData)) throw new Error('data must be an array')
-  postMessage(listsData)
-})
 ````
 
 ## File: src/_locales/de/messages.json
@@ -11592,21 +14576,465 @@ addEventListener('message', msg => {
 }
 ````
 
-## File: src/app/index.js
+## File: src/common/constants.js
 ````javascript
-import { mount } from 'svelte';
-import App from './App.svelte';
+export const COLORS = [
+  '', 'red', 'pink', 'purple',
+  'indigo', 'blue', 'cyan', 'teal',
+  'green', 'yellow', 'orange', 'brown',
+]
 
-// Clear out the old 'new App' logic
-const target = document.getElementById('app') || document.body;
+export const ILLEGAL_URLS = ['about:', 'chrome:', 'file:', 'wss:', 'ws:']
 
-const app = mount(App, {
-  target: target,
-  props: { /* any props you need */ }
-});
+export const PICKED_TAB_PROPS = ['url', 'title', 'favIconUrl', 'pinned']
+export const PICKED_LIST_RPOPS = ['_id', 'tabs', 'title', 'tags', 'category', 'time', 'pinned', 'expand', 'color', 'updatedAt']
+export const SYNCED_LIST_PROPS = ['_id', 'tabs', 'title', 'tags', 'category', 'time', 'pinned', 'color']
 
-// Note: If you need to remove the app later,
-// you use import { unmount } from 'svelte';
+export const TOKEN_KEY = 'token'
+export const AUTH_HEADER = 'auth'
+
+export const END_FRONT = 'front'
+export const END_BACKGROUND = 'background'
+
+export const SYNC_SERVICE_URL = DEBUG ? 'http://127.0.0.1:8000' : 'https://boss.cnwangjie.com'
+export const SYNC_MAX_INTERVAL = 864e5
+export const SYNC_MIN_INTERVAL = 3e5
+
+export const SYNC_PHASES = {
+  IDLE: 'idle',
+  SYNCING: 'syncing',
+  SYNCED: 'synced',
+  AUTH_ERROR: 'auth-error',
+  OFFLINE: 'offline',
+  SERVER_ERROR: 'server-error',
+  NEVER_SYNCED: 'never-synced',
+  LOCAL_ONLY: 'local-only',
+}
+
+export const ADD_LIST = 'addList'
+export const UPDATE_LIST_BY_ID = 'updateListById'
+export const REMOVE_LIST_BY_ID = 'removeListById'
+export const CHANGE_LIST_ORDER = 'changeListOrderRelatively'
+
+export const SENTRY_DSN = 'https://3a924dd322e24dbca1c28364de767ffc@sentry.io/1307154'
+
+export const RUNTIME_MESSAGES = {
+  STASH_CURRENT_TAB: 'STASH_CURRENT_TAB',
+  STASH_COMPLETED: 'STASH_COMPLETED',
+  STASH_FAILED: 'STASH_FAILED',
+}
+````
+
+## File: src/common/options.js
+````javascript
+import _ from 'lodash'
+import __ from '@/common/i18n'
+
+const cate = {
+  BEHAVIOUR: 'behaviour',
+  APPEARANCE: 'appearance',
+  PERFOREMANCE: 'performance',
+}
+
+export const getOptionsList = () => [
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'browserAction',
+    type: String,
+    default: 'show-list',
+    items: [
+      {
+        value: 'popup',
+        label: __('opt_label_popup'),
+      },
+      {
+        value: 'store-selected',
+        label: __('opt_label_store_selected'),
+      },
+      {
+        value: 'store-all',
+        label: __('opt_label_store_all'),
+      },
+      {
+        value: 'show-list',
+        label: __('opt_label_show_list'),
+      },
+      {
+        value: 'none',
+        label: __('opt_label_none'),
+      },
+    ],
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'itemClickAction',
+    type: String,
+    default: 'open-and-remove',
+    items: [
+      {
+        value: 'open-and-remove',
+        label: __('opt_label_open_and_remove'),
+      },
+      {
+        value: 'open',
+        label: __('opt_label_open'),
+      },
+      {
+        value: 'none',
+        label: __('opt_label_none'),
+      },
+    ],
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'popupItemClickAction',
+    type: String,
+    default: 'restore',
+    items: [
+      {
+        value: 'restore',
+        label: __('opt_label_restore'),
+      },
+      {
+        value: 'restore-new-window',
+        label: __('opt_label_restore_new_window'),
+      },
+      {
+        value: 'none',
+        label: __('opt_label_none'),
+      },
+    ],
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'removeItemBtnPos',
+    type: String,
+    default: 'left',
+    items: [
+      {
+        value: 'left',
+        label: __('opt_label_left'),
+      },
+      {
+        value: 'right',
+        label: __('opt_label_right'),
+      },
+    ],
+    deprecated: '1.4',
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'defaultNightMode',
+    type: Boolean,
+    default: false,
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'itemDisplay',
+    type: String,
+    default: 'title-and-url',
+    items: [
+      {
+        value: 'title-and-url',
+        label: __('opt_label_title_and_url'),
+      },
+      {
+        value: 'title',
+        label: __('opt_label_title'),
+      },
+      {
+        value: 'url',
+        label: __('opt_label_url'),
+      },
+    ],
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'hideFavicon',
+    type: Boolean,
+    default: false,
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'fixedToolbar',
+    type: Boolean,
+    default: false,
+    deprecated: '1.4',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'addHistory',
+    type: Boolean,
+    default: true,
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'ignorePinned',
+    type: Boolean,
+    default: false,
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'pinNewList',
+    type: Boolean,
+    default: false,
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'pageContext',
+    type: Boolean,
+    default: true,
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'allContext',
+    type: Boolean,
+    default: false,
+    deps: ({ pageContext }) => pageContext,
+    new: '1.3.6',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'openTabListWhenNewTab',
+    desc: true,
+    deps: ({ disableDynamicMenu }) => !disableDynamicMenu,
+    type: Boolean,
+    default: false,
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'alertRemoveList',
+    type: Boolean,
+    default: false,
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'excludeIllegalURL',
+    type: Boolean,
+    default: true,
+    new: '1.3.6',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'removeDuplicate',
+    type: Boolean,
+    default: false,
+    new: '1.3.6',
+  },
+  // START - Comment out Boss sync options
+  /*
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'useBoss',
+    type: Boolean,
+    default: false,
+    new: '1.3.0',
+    desc: true,
+  },
+  */
+  // END - Comment out Boss sync options
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'syncBaseUrl',
+    type: String,
+    default: 'http://localhost:8000',
+    new: '1.4.1',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'syncApiKey',
+    type: String,
+    default: '',
+    new: '1.4.1',
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'enableSearch',
+    type: Boolean,
+    default: true,
+    new: '1.3.7',
+    deprecated: '1.4',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'openEnd',
+    type: Boolean,
+    default: true,
+    new: '1.3.9',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'openTabListNoTab',
+    type: Boolean,
+    default: true,
+    new: '1.4.0',
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'listsPerPage',
+    type: String,
+    default: 10,
+    items: [
+      {
+        value: 5,
+        label: 5,
+      },
+      {
+        value: 10,
+        label: 10,
+      },
+      {
+        value: 15,
+        label: 15,
+      },
+    ],
+    new: '1.4.0',
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'titleFontSize',
+    type: String,
+    default: '12px',
+    items: [
+      {
+        value: '12px',
+        label: '12px',
+      },
+      {
+        value: '18px',
+        label: '18px',
+      },
+      {
+        value: '24px',
+        label: '24px',
+      },
+    ],
+    new: '1.4.0',
+  },
+  {
+    cate: cate.PERFOREMANCE,
+    name: 'disableDynamicMenu',
+    type: Boolean,
+    default: false,
+    new: '1.4.0',
+  },
+  {
+    cate: cate.PERFOREMANCE,
+    name: 'disableExpansion',
+    type: Boolean,
+    default: false,
+    new: '1.4.0',
+  },
+  {
+    cate: cate.PERFOREMANCE,
+    name: 'disableTransition',
+    type: Boolean,
+    default: false,
+    new: '1.4.0',
+  },
+  {
+    cate: cate.PERFOREMANCE,
+    name: 'disableSearch',
+    type: Boolean,
+    default: false,
+    new: '1.4.0',
+  },
+].filter(i => !i.deprecated)
+
+const _defaultOptions = _.mapValues(_.keyBy(getOptionsList(), 'name'), i => i.default)
+const getDefaultOptions = () => _defaultOptions
+
+export default { getDefaultOptions, getOptionsList }
+````
+
+## File: src/app/router/index.js
+````javascript
+// src/app/router/index.js
+import Vue from 'vue'
+import Router from 'vue-router'
+const Popup = () => import(/* webpackChunkName: "popup" */ '@/app/page/Popup')
+const Main = () => import(/* webpackChunkName: "main" */ '@/app/page/Main')
+// const SyncInfo = () => import(/* webpackChunkName: "main" */ '@/app/page/main/SyncInfo')
+const Options = () => import(/* webpackChunkName: "main" */ '@/app/page/main/Options')
+const About = () => import(/* webpackChunkName: "main" */ '@/app/page/main/About')
+const ImportExport = () => import(/* webpackChunkName: "main" */ '@/app/page/main/ImportExport')
+const Search = () => import(/* webpackChunkName: "main" */ '@/app/page/main/Search')
+const DetailList = () => import(/* webpackChunkName: "main" */ '@/app/page/main/DetailList')
+
+Vue.use(Router)
+
+// Remove this unused variable:
+// const isPopup = new URLSearchParams(window.location.search).get('context') === 'popup'
+
+const router = new Router({
+  routes: [
+    {
+      path: '/',
+      // When in a popup, go directly to the detailed list view.
+      redirect: () => {
+        const isPopup = new URLSearchParams(window.location.search).get('context') === 'popup'
+        return isPopup ? '/app/list' : '/app'
+      }
+    },
+    {
+      path: '/popup',
+      component: Popup,
+      name: 'popup',
+    },
+    {
+      path: '/app',
+      component: Main,
+      children: [
+        // {
+        //   path: 'options/sync',
+        //   component: SyncInfo,
+        //   name: 'syncInfo',
+        // },
+        {
+          path: 'options',
+          component: Options,
+          name: 'options',
+        },
+        {
+          path: 'about',
+          component: About,
+          name: 'about',
+        },
+        {
+          path: 'import-export',
+          component: ImportExport,
+          name: 'import-export',
+        },
+        {
+          path: 'search',
+          component: Search,
+          name: 'search',
+        },
+        {
+          path: 'list',
+          component: DetailList,
+          name: 'detailList',
+        },
+        {
+          path: 'list/pinned',
+          component: DetailList,
+          name: 'pinnedList',
+        },
+        {
+          path: 'list/tag/:tag',
+          component: DetailList,
+          name: 'taggedList'
+        },
+        {
+          path: '*',
+          redirect: { name: 'detailList' }
+        },
+      ],
+    },
+  ]
+})
+
+export default router
 ````
 
 ## File: src/app/store/lists.js
@@ -11821,171 +15249,195 @@ export default {
 }
 ````
 
-## File: src/common/constants.js
+## File: src/common/listManager.js
 ````javascript
-export const COLORS = [
-  '', 'red', 'pink', 'purple',
-  'indigo', 'blue', 'cyan', 'teal',
-  'green', 'yellow', 'orange', 'brown',
-]
+import browser from 'webextension-polyfill'
+import {
+  SYNCED_LIST_PROPS,
+  END_FRONT,
+  END_BACKGROUND,
+  ADD_LIST,
+  UPDATE_LIST_BY_ID,
+  REMOVE_LIST_BY_ID,
+  CHANGE_LIST_ORDER,
+} from './constants'
+import {isBackground, sendMessage, Mutex} from './utils'
 
-export const ILLEGAL_URLS = ['about:', 'chrome:', 'file:', 'wss:', 'ws:']
-
-export const PICKED_TAB_PROPS = ['url', 'title', 'favIconUrl', 'pinned']
-export const PICKED_LIST_RPOPS = ['_id', 'tabs', 'title', 'tags', 'category', 'time', 'pinned', 'expand', 'color', 'updatedAt']
-export const SYNCED_LIST_PROPS = ['_id', 'tabs', 'title', 'tags', 'category', 'time', 'pinned', 'color']
-
-export const TOKEN_KEY = 'token'
-export const AUTH_HEADER = 'auth'
-
-export const END_FRONT = 'front'
-export const END_BACKGROUND = 'background'
-
-export const SYNC_SERVICE_URL = DEBUG ? 'http://127.0.0.1:8000' : 'https://boss.cnwangjie.com'
-export const SYNC_MAX_INTERVAL = 864e5
-export const SYNC_MIN_INTERVAL = 3e5
-
-export const ADD_LIST = 'addList'
-export const UPDATE_LIST_BY_ID = 'updateListById'
-export const REMOVE_LIST_BY_ID = 'removeListById'
-export const CHANGE_LIST_ORDER = 'changeListOrderRelatively'
-
-export const SENTRY_DSN = 'https://3a924dd322e24dbca1c28364de767ffc@sentry.io/1307154'
-````
-
-## File: src/common/exchange.js
-````javascript
-import _ from 'lodash'
-import moment from 'moment'
-import download from 'downloadjs'
-import list from './list'
-import storage from './storage'
-
-const importFromText = (compatible, data) => new Promise((resolve, reject) => {
-  const exchanger = new Worker('exchanger.js')
-  exchanger.addEventListener('message', e => {
-    if (!e.data || e.data.length == null) return
-    exchanger.terminate()
-    const lists = e.data.map(list.createNewTabList)
-    resolve(lists)
-  })
-  exchanger.addEventListener('error', reject)
-  exchanger.postMessage({compatible, data})
-})
-
-const exportToText = async compatible => {
-  const lists = await storage.getLists()
-  if (compatible) return lists.map(list => list.tabs.map(tab => tab.url + ' | ' + tab.title).join('\n')).join('\n\n')
-  return JSON.stringify(lists.map(i => _.pick(i, ['tabs', 'title', 'time', 'tags', 'expand', 'pinned'])), null, 4)
+const cache = { lists: null, ops: null }
+const RWLock = new Mutex()
+const getStorage = async () => {
+  const unlockRW = await RWLock.lock()
+  if (cache.lists && cache.ops) return cache
+  const {lists, ops} = await browser.storage.local.get(['lists', 'ops'])
+  cache.lists = lists || []
+  cache.ops = ops || []
+  await unlockRW()
+  return cache
 }
+const compressOps = ops => {
+  console.debug('[listManager] compress ops: (before)', ops)
+  const removed = []
+  const updated = {}
+  const finalOps = []
+  for (let i = ops.length - 1; i > -1; i -= 1) {
+    const op = ops[i]
+    // ignore all actions for the list if that list will be removed finally
+    if (op.args && op.args[0] && removed.includes(op.args[0]._id)
+      || typeof op.args[0] === 'string' && removed.includes(op.args[0])) continue
 
-const exportToFile = (text, {type, suffix}) => {
-  const name = 'IceTab_backup_' + moment().format('L') + suffix
-  const blob = new Blob(['\ufeff' + text], {type})
-  download(blob, name, type)
-}
-
-const types = {
-  JSON: { type: 'application/json; charset=utf-8', suffix: '.json' },
-  TEXT: { type: 'plain/text; charset=utf-8', suffix: '.txt' },
-}
-
-export default {
-  importFromText,
-  exportToText,
-  exportToFile,
-  types,
-}
-````
-
-## File: src/app/router/index.js
-````javascript
-// src/app/router/index.js
-import Vue from 'vue'
-import Router from 'vue-router'
-const Popup = () => import(/* webpackChunkName: "popup" */ '@/app/page/Popup')
-const Main = () => import(/* webpackChunkName: "main" */ '@/app/page/Main')
-// const SyncInfo = () => import(/* webpackChunkName: "main" */ '@/app/page/main/SyncInfo')
-const Options = () => import(/* webpackChunkName: "main" */ '@/app/page/main/Options')
-const About = () => import(/* webpackChunkName: "main" */ '@/app/page/main/About')
-const ImportExport = () => import(/* webpackChunkName: "main" */ '@/app/page/main/ImportExport')
-const Search = () => import(/* webpackChunkName: "main" */ '@/app/page/main/Search')
-const DetailList = () => import(/* webpackChunkName: "main" */ '@/app/page/main/DetailList')
-
-Vue.use(Router)
-
-// Remove this unused variable:
-// const isPopup = new URLSearchParams(window.location.search).get('context') === 'popup'
-
-const router = new Router({
-  routes: [
-    {
-      path: '/',
-      // When in a popup, go directly to the detailed list view.
-      redirect: () => {
-        const isPopup = new URLSearchParams(window.location.search).get('context') === 'popup'
-        return isPopup ? '/app/list' : '/app'
+    if (op.method === 'removeListById') {
+      removed.push(op.args[0])
+      finalOps.unshift(op)
+    } else if (op.method === 'updateListById') {
+      // keep the final result of every property if a list will be updated
+      const [listId, newList, time] = op.args
+      if (updated[listId]) {
+        for (const key in newList) {
+          if (key in updated[listId]) continue
+          updated[listId][key] = newList[key]
+        }
+        continue
+      } else {
+        updated[listId] = Object.assign({}, newList)
+        finalOps.unshift({method: 'updateListById', args: [listId, updated[listId], time]})
       }
-    },
-    {
-      path: '/popup',
-      component: Popup,
-      name: 'popup',
-    },
-    {
-      path: '/app',
-      component: Main,
-      children: [
-        // {
-        //   path: 'options/sync',
-        //   component: SyncInfo,
-        //   name: 'syncInfo',
-        // },
-        {
-          path: 'options',
-          component: Options,
-          name: 'options',
-        },
-        {
-          path: 'about',
-          component: About,
-          name: 'about',
-        },
-        {
-          path: 'import-export',
-          component: ImportExport,
-          name: 'import-export',
-        },
-        {
-          path: 'search',
-          component: Search,
-          name: 'search',
-        },
-        {
-          path: 'list',
-          component: DetailList,
-          name: 'detailList',
-        },
-        {
-          path: 'list/pinned',
-          component: DetailList,
-          name: 'pinnedList',
-        },
-        {
-          path: 'list/tag/:tag',
-          component: DetailList,
-          name: 'taggedList'
-        },
-        {
-          path: '*',
-          redirect: { name: 'detailList' }
-        },
-      ],
-    },
-  ]
+    } else if (op.method === 'changeListOrderRelatively') {
+      // combine the value if a list is reordered continuously
+      if (i > 0 && ops[i - 1].method === 'changeListOrderRelatively' && op.args[0] === ops[i - 1].args[0]) {
+        ops[i - 1].args[1] += ops[i].args[1]
+      } else finalOps.unshift(op)
+    } else {
+      // do nothing if add a list
+      finalOps.unshift(op)
+    }
+  }
+  console.debug('[listManager] compress ops: (after)', finalOps)
+  return finalOps
+}
+
+const manager = {}
+// lists modifier (return true if need to add ops)
+manager.modifiers = {
+  [ADD_LIST](lists, [list]) {
+    if (~lists.findIndex(i => i._id === list._id)) return
+    lists.unshift(list)
+    return [list]
+  },
+  [UPDATE_LIST_BY_ID](lists, [listId, newList, time = Date.now()]) {
+    const normal = Object.keys(newList).some(k => SYNCED_LIST_PROPS.includes(k))
+    for (let i = 0; i < lists.length; i += 1) {
+      if (lists[i]._id !== listId) continue
+      const list = lists[i]
+      for (const [k, v] of Object.entries(newList)) {
+        list[k] = v
+      }
+      if (normal) list.updatedAt = time
+      return normal ? [listId, newList, time] : null
+    }
+  },
+  [REMOVE_LIST_BY_ID](lists, [listId]) {
+    const index = lists.findIndex(list => list._id === listId)
+    lists.splice(index, 1)
+    return [listId]
+  },
+  [CHANGE_LIST_ORDER](lists, [listId, diff]) {
+    const index = lists.findIndex(list => list._id === listId)
+    const [list] = lists.splice(index, 1)
+    lists.splice(index + diff, 0, list)
+    return [listId, diff]
+  },
+}
+
+// use myself throttle function to replace Lodash.throttle to make sure
+// this function cannot be executed concurrently
+const saveStorage = async (lists, ops) => {
+  const unlock = await RWLock.lock()
+  const data = {
+    lists,
+    ops: compressOps(ops)
+  }
+  await browser.storage.local.set(data)
+  cache.lists = cache.ops = null
+  await sendMessage({refresh: true})
+  await unlock()
+}
+// avoid getting storage at the same time
+const _modifyQueue = []
+const _startModifyWork = (lists, ops) => new Promise(resolve => {
+  while (_modifyQueue.length) {
+    const [method, args] = _modifyQueue.shift()
+    const opArgs = manager.modifiers[method](lists, args)
+    if (opArgs) ops.push({method, args: opArgs, time: Date.now()})
+  }
+  setTimeout(() => {
+    if (_modifyQueue.length) _startModifyWork(lists, ops).then(resolve)
+    else resolve()
+  }, 100)
 })
 
-export default router
+let _working = false
+const applyChangesToStorage = async (method, args) => {
+  _modifyQueue.push([method, args])
+  // not need to start work if modify work is processing
+  if (_working) return
+  _working = true
+  const {lists, ops} = await getStorage()
+  await _startModifyWork(lists, ops)
+  // from here won't modify data if do not call start function
+  _working = false
+  await saveStorage(lists, ops)
+}
+const addEventListener = (receiveFrom, callback) => browser.runtime.onMessage.addListener(({listModifed, from}) => {
+  if (receiveFrom !== from || !listModifed) return
+  const {method, args} = listModifed
+  return callback(method, args)
+})
+const genMethods = isBackground => {
+  Object.keys(manager.modifiers).forEach(method => {
+    manager[method] = isBackground ? async (...args) => { // for background
+      console.debug('[list manager] modify list:', method, ...args)
+      await sendMessage({listModifed: {method, args}, from: END_BACKGROUND})
+      // no need to await changes applied for close tabs immediately
+      applyChangesToStorage(method, args)
+    } : async (...args) => { // for front end
+      console.debug('[list manager] call to modify list:', name, ...args)
+      await sendMessage({listModifed: {method, args}, from: END_FRONT})
+    }
+  })
+}
+manager.init = async () => {
+  if (manager.inited) return
+  manager.inited = true
+  const _isBackground = await isBackground()
+  if (_isBackground) await addEventListener(END_FRONT, applyChangesToStorage)
+  genMethods(_isBackground)
+}
+manager.mapMutations = () => {
+  const mutations = {}
+  Object.entries(manager.modifiers).forEach(([method, fn]) => {
+    mutations[method] = (state, payload) => fn(state.lists, payload)
+  })
+  mutations.receiveData = (state, {method, args}) => {
+    manager.modifiers[method](state.lists, args)
+  }
+  return mutations
+}
+manager.createVuexPlugin = () => store => {
+  addEventListener(END_BACKGROUND, (method, args) => {
+    store.commit('receiveData', {method, args})
+  })
+  browser.runtime.onMessage.addListener(({refreshed}) => {
+    if (refreshed && refreshed.success) store.dispatch('getLists')
+  })
+  store.subscribe(({type, payload}) => {
+    if (type in manager.modifiers) {
+      manager[type](...payload)
+    }
+  })
+}
+manager.RWLock = RWLock
+manager.isWorking = () => _working
+export default manager
 ````
 
 ## File: CHANGELOG.md
@@ -12211,14 +15663,374 @@ export default router
  - feat: Import & export
 ````
 
+## File: src/app/index.js
+````javascript
+import { mount } from 'svelte';
+import "@/assets/css/fontawesome-all.min.css";
+import "@/assets/css/index.css";
+import App from './App.svelte';
+
+// Clear out the old 'new App' logic
+const target = document.getElementById('app') || document.body;
+
+mount(App, {
+  target: target,
+  props: { /* any props you need */ }
+});
+
+// Note: If you need to remove the app later,
+// you use import { unmount } from 'svelte';
+````
+
+## File: src/_locales/zh_CN/messages.json
+````json
+{
+  "ext_name": {
+    "message": "IceTab"
+  },
+  "ext_desc": {
+    "message": "一个更好的 OneTab 扩展"
+  },
+  "menu_STORE_SELECTED_TABS": {
+    "message": "保存选中的标签页"
+  },
+  "menu_STORE_ALL_TABS_IN_CURRENT_WINDOW": {
+    "message": "保存当前窗口的所有标签页"
+  },
+  "menu_SHOW_TAB_LIST": {
+    "message": "显示标签页列表"
+  },
+  "menu_STORE_ALL_TABS_IN_ALL_WINDOWS": {
+    "message": "保存所有窗口的所有标签页"
+  },
+  "menu_EXTRA": {
+    "message": "额外功能"
+  },
+  "menu_STORE_LEFT_TABS": {
+    "message": "保存左侧标签页"
+  },
+  "menu_STORE_RIGHT_TABS": {
+    "message": "保存右侧标签页"
+  },
+  "menu_STORE_TWOSIDE_TABS": {
+    "message": "保存未选中标签页"
+  },
+  "menu_STORE": {
+    "message": "储存"
+  },
+  "menu_STORE_TO_TITLED_LIST": {
+    "message": "储存至"
+  },
+  "cmd_store_selected_tabs": {
+    "message": "保存已选中标签页"
+  },
+  "cmd_store_all_tabs": {
+    "message": "保存所有标签页"
+  },
+  "cmd_restore_lastest_list": {
+    "message": "恢复最后的列表"
+  },
+  "cmd_open_lists": {
+    "message": "打开标签页列表"
+  },
+  "cmd_store_all_in_all_windows": {
+    "message": "保存所有窗口的所有标签页"
+  },
+  "opt_name_browserAction": {
+    "message": "图标被点击的行为"
+  },
+  "opt_name_itemClickAction": {
+    "message": "列表中的某一项被点击的行为"
+  },
+  "opt_name_itemDisplay": {
+    "message": "列表中的项显示的内容"
+  },
+  "opt_name_hideFavicon": {
+    "message": "列表中不显示图标"
+  },
+  "opt_name_removeItemBtnPos": {
+    "message": "移除标签页的按钮位置"
+  },
+  "opt_name_popupItemClickAction": {
+    "message": "弹出列表中的项被点击的行为"
+  },
+  "opt_name_defaultNightMode": {
+    "message": "默认使用夜间模式"
+  },
+  "opt_name_fixedToolbar": {
+    "message": "固定顶部工具栏"
+  },
+  "opt_name_addHistory": {
+    "message": "保存的标签页添加到历史记录"
+  },
+  "opt_name_ignorePinned": {
+    "message": "不保存已固定的标签页"
+  },
+  "opt_name_pinNewList": {
+    "message": "自动固定新的列表"
+  },
+  "opt_name_pageContext": {
+    "message": "出现在页面的右键菜单中"
+  },
+  "opt_name_allContext": {
+    "message": "出现在所有元素的右键菜单中"
+  },
+  "opt_name_openTabListWhenNewTab": {
+    "message": "当新标签页时打开标签列表"
+  },
+  "opt_desc_openTabListWhenNewTab": {
+    "message": "当前页面为新标签页的时候点击图标时显示标签页列表 (不会覆盖弹出简易列表的行为)"
+  },
+  "opt_name_alertRemoveList": {
+    "message": "删除列表时确认"
+  },
+  "opt_name_excludeIllegalURL": {
+    "message": "排除非标准 URL，例如 about:* 和 chrome://*"
+  },
+  "opt_name_removeDuplicate": {
+    "message": "列表中避免重复"
+  },
+  "opt_name_enableSearch": {
+    "message": "详细列表中启用搜索功能"
+  },
+  "opt_name_openEnd": {
+    "message": "恢复列表时标签页在末尾打开"
+  },
+  "opt_name_openTabListNoTab": {
+    "message": "当储存所有标签时打开标签列表"
+  },
+  "opt_name_listsPerPage": {
+    "message": "每页的列表数量"
+  },
+  "opt_name_titleFontSize": {
+    "message": "列表标题的字体大小"
+  },
+  "opt_name_disableDynamicMenu": {
+    "message": "禁用动态更新菜单"
+  },
+  "opt_name_disableExpansion": {
+    "message": "禁用可展开的列表"
+  },
+  "opt_name_disableTransition": {
+    "message": "禁用所有 CSS 过渡动画"
+  },
+  "opt_name_disableSearch": {
+    "message": "禁用搜索功能"
+  },
+  "opt_label_popup": {
+    "message": "弹出简单列表"
+  },
+  "opt_label_store_selected": {
+    "message": "保存选中的标签页"
+  },
+  "opt_label_store_all": {
+    "message": "保存当前窗口的所有标签页"
+  },
+  "opt_label_show_list": {
+    "message": "显示完整标签页列表"
+  },
+  "opt_label_none": {
+    "message": "无动作"
+  },
+  "opt_label_open_and_remove": {
+    "message": "打开并移除"
+  },
+  "opt_label_open": {
+    "message": "打开"
+  },
+  "opt_label_restore": {
+    "message": "恢复"
+  },
+  "opt_label_restore_new_window": {
+    "message": "恢复至新的窗口"
+  },
+  "opt_label_left": {
+    "message": "标签页左侧"
+  },
+  "opt_label_right": {
+    "message": "标签页右侧"
+  },
+  "opt_label_title_and_url": {
+    "message": "标题和地址"
+  },
+  "opt_label_title": {
+    "message": "标题"
+  },
+  "opt_label_url": {
+    "message": "地址"
+  },
+  "ui_nightmode": {
+    "message": "夜间模式"
+  },
+  "ui_tab": {
+    "message": "个标签页"
+  },
+  "ui_created": {
+    "message": "创建于"
+  },
+  "ui_retitle_list": {
+    "message": "列表更名"
+  },
+  "ui_restore_all": {
+    "message": "列表还原"
+  },
+  "ui_restore_all_in_new_window": {
+    "message": "列表还原至新窗口"
+  },
+  "ui_remove_list": {
+    "message": "删除列表"
+  },
+  "ui_pin": {
+    "message": "固定"
+  },
+  "ui_unpin": {
+    "message": "取消固定"
+  },
+  "ui_list": {
+    "message": "列表"
+  },
+  "ui_pinned": {
+    "message": "已固定"
+  },
+  "ui_duplicate": {
+    "message": "复制"
+  },
+  "ui_copy_link": {
+    "message": "复制链接"
+  },
+  "ui_copy_title": {
+    "message": "复制标题"
+  },
+  "ui_remove": {
+    "message": "删除"
+  },
+  "ui_open": {
+    "message": "打开"
+  },
+  "ui_create_issue": {
+    "message": "反馈问题"
+  },
+  "ui_options": {
+    "message": "选项"
+  },
+  "ui_options_behaviour": {
+    "message": "行为"
+  },
+  "ui_options_appearance": {
+    "message": "外观"
+  },
+  "ui_options_performance": {
+    "message": "性能"
+  },
+  "ui_options_sync": {
+    "message": "同步"
+  },
+  "ui_about": {
+    "message": "关于"
+  },
+  "ui_keyboard_shortcuts": {
+    "message": "键盘快捷键"
+  },
+  "ui_export_import": {
+    "message": "导出 / 导入"
+  },
+  "ui_github": {
+    "message": "代码仓库"
+  },
+  "ui_tab_list": {
+    "message": "标签页列表"
+  },
+  "ui_export": {
+    "message": "导出"
+  },
+  "ui_import": {
+    "message": "导入"
+  },
+  "ui_export_comp": {
+    "message": "导出 (兼容 OneTab)"
+  },
+  "ui_export_json": {
+    "message": "导出至 JSON"
+  },
+  "ui_save_as_file": {
+    "message": "保存为文件"
+  },
+  "ui_copy": {
+    "message": "复制"
+  },
+  "ui_copied": {
+    "message": "复制成功!"
+  },
+  "ui_import_from_file": {
+    "message": "导入文件"
+  },
+  "ui_import_comp": {
+    "message": "导入 (兼容 OneTab)"
+  },
+  "ui_import_json": {
+    "message": "从 JSON 中导入"
+  },
+  "ui_main_processing": {
+    "message": "处理中..."
+  },
+  "ui_main_error_occurred": {
+    "message": "发生了一些错误"
+  },
+  "ui_main_succeeded": {
+    "message": "成功！"
+  },
+  "ui_opt_changes_saved": {
+    "message": "修改已保存！"
+  },
+  "ui_title_pin_btn": {
+    "message": "固定列表"
+  },
+  "ui_title_up_btn": {
+    "message": "上移列表"
+  },
+  "ui_title_down_btn": {
+    "message": "下移列表"
+  },
+  "ui_save_to_gdrive": {
+    "message": "将列表保存至 Google Drive"
+  },
+  "ui_save_immediately": {
+    "message": "立即保存"
+  },
+  "ui_no_list": {
+    "message": "没有标签页"
+  },
+  "ui_no_list_tip": {
+    "message": "1. 选中你想保存的标签页</br>2. 右键点击扩展图标</br>3. 点击 \"保存选中的标签页\"<p class=\"body-2\">在其他设备使用过？ 授权同步服务可以自动恢复列表。</p>"
+  },
+  "ui_untitled": {
+    "message": "未命名"
+  },
+  "ui_updated_to_ver": {
+    "message": "IceTab 已更新至"
+  },
+  "ui_click_view_changelog": {
+    "message": "点击查看详细更新日志"
+  },
+  "ui_move_to": {
+    "message": "移动至"
+  },
+  "ui_a_new_list": {
+    "message": "(一个新列表)"
+  }
+}
+````
+
 ## File: src/app/index.html
 ````html
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <link rel="stylesheet" href="../assets/css/fontawesome-all.min.css">
   <title>IceTab</title>
   <style>
     body {
@@ -12243,10 +16055,266 @@ export default router
     }
   </style>
 </head>
+
 <body>
   <div id="app"></div>
 </body>
+
 </html>
+````
+
+## File: src/app/store/index.js
+````javascript
+import _ from 'lodash'
+import Vue from 'vue'
+import Vuex from 'vuex'
+import storage from '@/common/storage'
+import options from '@/common/options' // eslint-disable-line no-unused-vars
+// import boss from '@/common/service/boss' // Comment out this import
+import listManager from '@/common/listManager'
+import {sleep} from '@/common/utils'
+
+import lists from './lists'
+
+Vue.use(Vuex)
+
+export default new Vuex.Store({
+  strict: DEBUG,
+  state: {
+    opts: options.getDefaultOptions(),
+    hasToken: false,
+    drawer: true,
+    nightmode: false,
+    snackbar: { status: false, msg: '' },
+    scrollY: 0,
+    ...lists.state,
+  },
+  getters: {
+    ...lists.getters,
+  },
+  mutations: {
+    setOption(state, payload) {
+      if (!payload) return
+      for (const [k, v] of Object.entries(payload)) {
+        Vue.set(state.opts, k, v)
+      }
+      if ('defaultNightMode' in payload) {
+        state.nightmode = payload.defaultNightMode
+      }
+    },
+    setToken(state, payload) {
+      state.hasToken = payload
+    },
+    setDrawer(state, drawer) {
+      state.drawer = drawer
+    },
+    setNightmode(state, payload) {
+      state.nightmode = payload
+    },
+    setSnackbar(state, message) {
+      state.snackbar.msg = message
+      state.snackbar.status = true
+    },
+    closeSnackbar(state) {
+      state.snackbar.status = false
+    },
+    setScrollY(state, v) {
+      state.scrollY = v
+    },
+    ...lists.mutations,
+  },
+  actions: {
+    async initializeState({ commit, dispatch }) {
+      await listManager.init()
+      const loadedOptions = await storage.getOptions()
+      if (loadedOptions) {
+        commit('setOption', loadedOptions)
+      }
+      // Check for the 'context=popup' query parameter
+      const isPopup = new URLSearchParams(window.location.search).get('context') === 'popup'
+      if (isPopup) {
+        commit('setDrawer', false)
+      } else {
+        const drawer = await storage.get('drawer')
+        commit('setDrawer', _.defaultTo(drawer, true))
+      }
+      commit('setToken', false)
+      await dispatch('preloadLists')
+    },
+    async setAndSaveOption({ commit, state }, { key, value }) {
+      const newOpts = { ...state.opts, [key]: value }
+      commit('setOption', newOpts)
+      await storage.setOptions(newOpts)
+    },
+    async switchDrawer({ commit, state }, newState) {
+      // If newState is a boolean, use it. Otherwise, toggle the current state.
+      const finalState = typeof newState === 'boolean' ? newState : !state.drawer;
+      commit('setDrawer', finalState);
+      await storage.set({ drawer: finalState });
+    },
+    async switchNightmode({ dispatch, state }) {
+      const newNightmodeState = !state.nightmode
+      await dispatch('setAndSaveOption', { key: 'defaultNightMode', value: newNightmodeState })
+    },
+    async showSnackbar({commit}, message) {
+      commit('setSnackbar', message)
+      await sleep(2000)
+      commit('closeSnackbar')
+    },
+    ...lists.actions,
+  },
+  plugins: [
+    listManager.createVuexPlugin(),
+  ],
+})
+````
+
+## File: src/background/init.js
+````javascript
+/* eslint-disable */
+import _ from 'lodash'
+// import logger from '../common/logger' // The logger has been temporarily disabled for debugging
+import options from '../common/options'
+import storage from '../common/storage'
+import migrate from '../common/migrate'
+import boss from '../common/service/boss' // Keep import as it's commented out in boss.js
+import {normalizeList} from '../common/list'
+import commandHandler from './commandHandler'
+import messageHandler from './messageHandler'
+import listManager from '../common/listManager'
+import {setupContextMenus, dynamicDisableMenu, handleContextMenuClicked} from './contextMenus'
+import installedEventHandler from './installedEventHandler'
+import {updateBrowserAction, getBrowserActionHandler, getCoverBrowserAction} from './browserAction'
+
+import browser from 'webextension-polyfill'
+
+// Global variables for the service worker context
+let opts_global = {};
+let nightmode_global = false;
+let boss_token_global = null;
+let updateVersion_global = null;
+let drawer_global = false;
+
+const initOptions = async () => {
+  const opts = await storage.getOptions() || {}
+  const defaultOptions = options.getDefaultOptions()
+
+  if (_.keys(defaultOptions).some(key => !_.has(opts, key))) {
+    _.defaults(opts, defaultOptions)
+    await storage.setOptions(opts)
+  }
+
+  nightmode_global = opts.defaultNightMode
+  opts_global = opts;
+  const storedDrawer = await storage.get('drawer');
+  drawer_global = _.defaultTo(storedDrawer, true);
+  return opts
+}
+
+const storageChangedHandler = async changes => {
+  console.debug('[storage changed]', changes)
+  if (changes.boss_token) {
+    boss_token_global = changes.boss_token.newValue
+  }
+  if (changes.opts) {
+    opts_global = changes.opts.newValue || options.getDefaultOptions();
+    nightmode_global = opts_global.defaultNightMode;
+  }
+  if (changes.drawer) {
+    drawer_global = changes.newValue;
+  }
+
+  if (changes.lists) {
+    if (opts_global.disableDynamicMenu) return
+    await setupContextMenus(opts_global)
+  }
+}
+
+const tabsChangedHandler = async activeInfo => {
+  if (opts_global.disableDynamicMenu) return
+  const currentCoverBrowserAction = getCoverBrowserAction();
+  if (currentCoverBrowserAction) {
+    await currentCoverBrowserAction(activeInfo);
+  }
+  dynamicDisableMenu()
+}
+
+const fixDirtyData = async () => {
+  const unlock = await listManager.RWLock.lock()
+  const {lists} = await browser.storage.local.get('lists')
+  if (lists) {
+    const cleanLists = lists.filter(_.isPlainObject).map(normalizeList)
+    await browser.storage.local.set({lists: cleanLists})
+  }
+  await unlock()
+}
+
+const init = async () => {
+  try {
+    // await logger.init() // The logger has been temporarily disabled for debugging
+    await listManager.init()
+    const opts = await initOptions()
+    await updateBrowserAction(opts.browserAction)
+    await setupContextMenus(opts)
+
+    browser.runtime.onInstalled.addListener(async () => {
+      const opts = await initOptions();
+      await setupContextMenus(opts);
+    });
+    if (browser.commands) {
+      browser.commands.onCommand.addListener(commandHandler)
+    } else {
+      console.warn("browser.commands API is not available. Keyboard shortcuts may not work.");
+    }
+    browser.runtime.onMessageExternal.addListener(commandHandler)
+    browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (msg.type === 'getGlobalState') {
+        if (msg.key === 'drawer') {
+          sendResponse({ [msg.key]: drawer_global });
+        } else if (msg.key === 'nightmode') {
+          sendResponse({ [msg.key]: nightmode_global });
+        }
+        return true;
+      }
+
+      if (msg.type === 'setGlobalState') {
+        (async () => {
+          if (msg.key === 'drawer') {
+            drawer_global = msg.value;
+            await storage.set({ drawer: msg.value });
+          } else if (msg.key === 'nightmode') {
+            nightmode_global = msg.value;
+            const currentOpts = await storage.getOptions();
+            currentOpts.defaultNightMode = msg.value;
+            await storage.setOptions(currentOpts);
+          }
+          sendResponse({ success: true });
+        })();
+        return true;
+      }
+
+      messageHandler(msg);
+    });
+    browser.runtime.onUpdateAvailable.addListener(detail => { updateVersion_global = detail.version })
+    browser.action.onClicked.addListener(async () => {
+      const handler = getBrowserActionHandler(opts_global.browserAction);
+      if (handler) {
+        await handler();
+      }
+    });
+    browser.contextMenus.onClicked.addListener(info => handleContextMenuClicked(info));
+    browser.tabs.onActivated.addListener(_.debounce(tabsChangedHandler, 200));
+    browser.storage.onChanged.addListener(storageChangedHandler);
+
+    await migrate()
+    await fixDirtyData()
+
+  } catch (error) {
+    console.error("A critical error occurred during background script initialization:", error);
+  }
+}
+
+export default init
 ````
 
 ## File: src/common/tabs.js
@@ -12347,6 +16415,12 @@ const storeTabs = async (tabs, listIndex) => {
   return browser.tabs.remove(tabs.map(i => i.id))
 }
 
+const storeCurrentTab = async listIndex => {
+  const tabs = await browser.tabs.query({active: true, currentWindow: true})
+  if (!tabs || tabs.length === 0) throw new Error('No active tab to stash')
+  return storeTabs(tabs, listIndex)
+}
+
 const storeLeftTabs = async listIndex => storeTabs((await groupTabsInCurrentWindow()).left, listIndex)
 const storeRightTabs = async listIndex => storeTabs((await groupTabsInCurrentWindow()).right, listIndex)
 const storeTwoSideTabs = async listIndex => storeTabs((await groupTabsInCurrentWindow()).twoSide, listIndex)
@@ -12424,6 +16498,7 @@ export default {
   storeTwoSideTabs,
   storeAllTabs,
   storeAllTabInAllWindows,
+  storeCurrentTab,
   restoreTabs,
   restoreList,
   restoreListInNewWindow,
@@ -12431,6 +16506,186 @@ export default {
   openTabLists,
   openAboutPage,
 }
+````
+
+## File: src/common/utils.js
+````javascript
+import _ from 'lodash'
+import __ from './i18n'
+import { formatDistanceToNow, format, isSameYear } from 'date-fns'
+import { enUS, zhCN } from 'date-fns/locale'
+import { COLORS } from './constants'
+import browser from 'webextension-polyfill'
+
+// Map your @@ui_locale to date-fns locale objects
+const dateFnsLocales = {
+  en: enUS,
+  zh_CN: zhCN,
+  de: zhCN, // Assuming 'de' maps to zhCN locale or needs a separate de locale from date-fns
+}
+
+const getDateFnsLocale = uiLocale => dateFnsLocales[uiLocale.split('-')[0]] || enUS
+
+export const formatTime = time => {
+  const date = new Date(time)
+  const now = new Date()
+  const locale = getDateFnsLocale(__('@@ui_locale'))
+
+  // If time difference is less than 1 hour (3600E3 milliseconds)
+  if (now.getTime() - time < 3600E3) {
+    return formatDistanceToNow(date, { addSuffix: true, locale })
+  }
+
+  const withYear = !isSameYear(date, now)
+  const formatString = `iii, MMMM do ${withYear ? 'yyyy' : ''}, HH:mm:ss`
+  return format(date, formatString, { locale })
+}
+export const one = fn => {
+  let executing = false
+  return async function onceAtSameTimeFunction(...args) {
+    if (executing) return
+    executing = true
+    let re
+    try {
+      re = await fn.apply(this, args) // eslint-disable-line no-invalid-this
+    } finally {
+      executing = false
+    }
+    return re
+  }
+}
+export const checkPermission = async permission => {
+  if (await browser.permissions.contains({ permissions: [permission] })) return true
+  return browser.permissions.request({ permissions: [permission] })
+}
+export const readFile = file => new Promise((resolve, reject) => {
+  const reader = new FileReader()
+  reader.onloadend = event => resolve(event.target.result)
+  reader.onerror = reject
+  reader.readAsText(file)
+})
+export const genObjectId = () => {
+  const timestamp = (new Date().getTime() / 1000 | 0).toString(16)
+  return timestamp + 'xxxxxxxxxxxxxxxx'.replace(/[x]/g, () => (Math.random() * 16 | 0).toString(16)).toLowerCase()
+}
+export const isBackground = () => typeof self.importScripts === 'function'
+
+export const formatSize = bytes => {
+  const sufixes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return !bytes && '0 Bytes' || (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sufixes[i]
+}
+export const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+export const getColorByHash = _.memoize(str => {
+  const hash = typeof str === 'string' ? str.split('').reduce((r, i) => i.charCodeAt(0) + r, 0) : 0
+  return COLORS[hash % COLORS.length]
+})
+
+export const timeout = (promise, ms) => Promise.race([
+  promise, new Promise((resolve, reject) => setTimeout(() => {
+    reject(new Error('promise timeout'))
+  }, ms))
+])
+
+export const compareVersion = (a, b) => {
+  if (a === b) return 0
+  const [ap, bp] = [a, b].map(i => i || '0').map(i => i.split('.').map(j => +j))
+  const len = Math.min(ap.length, bp.length)
+  for (let i = 0; i < len; i += 1) {
+    if (ap[i] !== bp[i]) return ap[i] - bp[i]
+  }
+  return ap.length - bp.length
+}
+
+export const sendMessage = async msg => {
+  try {
+    await browser.runtime.sendMessage(msg)
+  } catch (err) {
+    if (err.message === 'Could not establish connection. Receiving end does not exist.') {
+      return console.warn('error ignored', err.message)
+    }
+    throw err
+  }
+}
+
+export const throttle = (fn, ms) => {
+  let executing
+  let next
+  let nextArgs
+  let timeout
+  let lastTime
+  return async function throttled(...args) {
+    const now = Date.now()
+    if (now - lastTime < ms) {
+      next = true
+      nextArgs = args
+      if (timeout) clearTimeout(timeout)
+      timeout = setTimeout(() => {
+        throttled(...args)
+      })
+      return
+    }
+
+    if (executing) {
+      next = true
+      nextArgs = args
+      return
+    }
+
+    executing = true
+    lastTime = now
+
+    let re
+    try {
+      re = await fn.apply(this, args) // eslint-disable-line no-invalid-this
+    } finally {
+      executing = false
+      if (next) {
+        if (Date.now() - now > ms) {
+          next = false
+          if (timeout) clearTimeout(timeout)
+          throttled(...nextArgs)
+        }
+      }
+    }
+    return re
+  }
+}
+
+export class Mutex {
+  constructor() {
+    this._locking = Promise.resolve()
+    this._locks = 0
+  }
+
+  isLocked() {
+    return this._locks > 0
+  }
+
+  lock() {
+    this._locks += 1
+    let unlockNext
+    const willLock = new Promise(resolve => {
+      unlockNext = () => {
+        this._locks -= 1
+        resolve()
+      }
+    })
+    const willUnlock = this._locking.then(() => unlockNext)
+    this._locking = this._locking.then(() => willLock)
+    return willUnlock
+  }
+}
+
+export const getDomain = (url) => {
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.replace(/^www\./, '');
+  } catch (e) {
+    return url;
+  }
+};
 ````
 
 ## File: src/_locales/en/messages.json
@@ -12774,1145 +17029,6 @@ export default {
   },
   "ui_a_new_list": {
     "message": "(a new list)"
-  }
-}
-````
-
-## File: src/_locales/zh_CN/messages.json
-````json
-{
-  "ext_name": {
-    "message": "IceTab"
-  },
-  "ext_desc": {
-    "message": "一个更好的 OneTab 扩展"
-  },
-  "menu_STORE_SELECTED_TABS": {
-    "message": "保存选中的标签页"
-  },
-  "menu_STORE_ALL_TABS_IN_CURRENT_WINDOW": {
-    "message": "保存当前窗口的所有标签页"
-  },
-  "menu_SHOW_TAB_LIST": {
-    "message": "显示标签页列表"
-  },
-  "menu_STORE_ALL_TABS_IN_ALL_WINDOWS": {
-    "message": "保存所有窗口的所有标签页"
-  },
-  "menu_EXTRA": {
-    "message": "额外功能"
-  },
-  "menu_STORE_LEFT_TABS": {
-    "message": "保存左侧标签页"
-  },
-  "menu_STORE_RIGHT_TABS": {
-    "message": "保存右侧标签页"
-  },
-  "menu_STORE_TWOSIDE_TABS": {
-    "message": "保存未选中标签页"
-  },
-  "menu_STORE": {
-    "message": "储存"
-  },
-  "menu_STORE_TO_TITLED_LIST": {
-    "message": "储存至"
-  },
-  "cmd_store_selected_tabs": {
-    "message": "保存已选中标签页"
-  },
-  "cmd_store_all_tabs": {
-    "message": "保存所有标签页"
-  },
-  "cmd_restore_lastest_list": {
-    "message": "恢复最后的列表"
-  },
-  "cmd_open_lists": {
-    "message": "打开标签页列表"
-  },
-  "cmd_store_all_in_all_windows": {
-    "message": "保存所有窗口的所有标签页"
-  },
-  "opt_name_browserAction": {
-    "message": "图标被点击的行为"
-  },
-  "opt_name_itemClickAction": {
-    "message": "列表中的某一项被点击的行为"
-  },
-  "opt_name_itemDisplay": {
-    "message": "列表中的项显示的内容"
-  },
-  "opt_name_hideFavicon": {
-    "message": "列表中不显示图标"
-  },
-  "opt_name_removeItemBtnPos": {
-    "message": "移除标签页的按钮位置"
-  },
-  "opt_name_popupItemClickAction": {
-    "message": "弹出列表中的项被点击的行为"
-  },
-  "opt_name_defaultNightMode": {
-    "message": "默认使用夜间模式"
-  },
-  "opt_name_fixedToolbar": {
-    "message": "固定顶部工具栏"
-  },
-  "opt_name_addHistory": {
-    "message": "保存的标签页添加到历史记录"
-  },
-  "opt_name_ignorePinned": {
-    "message": "不保存已固定的标签页"
-  },
-  "opt_name_pinNewList": {
-    "message": "自动固定新的列表"
-  },
-  "opt_name_pageContext": {
-    "message": "出现在页面的右键菜单中"
-  },
-  "opt_name_allContext": {
-    "message": "出现在所有元素的右键菜单中"
-  },
-  "opt_name_openTabListWhenNewTab": {
-    "message": "当新标签页时打开标签列表"
-  },
-  "opt_desc_openTabListWhenNewTab": {
-    "message": "当前页面为新标签页的时候点击图标时显示标签页列表 (不会覆盖弹出简易列表的行为)"
-  },
-  "opt_name_alertRemoveList": {
-    "message": "删除列表时确认"
-  },
-  "opt_name_excludeIllegalURL": {
-    "message": "排除非标准 URL，例如 about:* 和 chrome://*"
-  },
-  "opt_name_removeDuplicate": {
-    "message": "列表中避免重复"
-  },
-  "opt_name_enableSearch": {
-    "message": "详细列表中启用搜索功能"
-  },
-  "opt_name_openEnd": {
-    "message": "恢复列表时标签页在末尾打开"
-  },
-  "opt_name_openTabListNoTab": {
-    "message": "当储存所有标签时打开标签列表"
-  },
-  "opt_name_listsPerPage": {
-    "message": "每页的列表数量"
-  },
-  "opt_name_titleFontSize": {
-    "message": "列表标题的字体大小"
-  },
-  "opt_name_disableDynamicMenu": {
-    "message": "禁用动态更新菜单"
-  },
-  "opt_name_disableExpansion": {
-    "message": "禁用可展开的列表"
-  },
-  "opt_name_disableTransition": {
-    "message": "禁用所有 CSS 过渡动画"
-  },
-  "opt_name_disableSearch": {
-    "message": "禁用搜索功能"
-  },
-  "opt_label_popup": {
-    "message": "弹出简单列表"
-  },
-  "opt_label_store_selected": {
-    "message": "保存选中的标签页"
-  },
-  "opt_label_store_all": {
-    "message": "保存当前窗口的所有标签页"
-  },
-  "opt_label_show_list": {
-    "message": "显示完整标签页列表"
-  },
-  "opt_label_none": {
-    "message": "无动作"
-  },
-  "opt_label_open_and_remove": {
-    "message": "打开并移除"
-  },
-  "opt_label_open": {
-    "message": "打开"
-  },
-  "opt_label_restore": {
-    "message": "恢复"
-  },
-  "opt_label_restore_new_window": {
-    "message": "恢复至新的窗口"
-  },
-  "opt_label_left": {
-    "message": "标签页左侧"
-  },
-  "opt_label_right": {
-    "message": "标签页右侧"
-  },
-  "opt_label_title_and_url": {
-    "message": "标题和地址"
-  },
-  "opt_label_title": {
-    "message": "标题"
-  },
-  "opt_label_url": {
-    "message": "地址"
-  },
-  "ui_nightmode": {
-    "message": "夜间模式"
-  },
-  "ui_tab": {
-    "message": "个标签页"
-  },
-  "ui_created": {
-    "message": "创建于"
-  },
-  "ui_retitle_list": {
-    "message": "列表更名"
-  },
-  "ui_restore_all": {
-    "message": "列表还原"
-  },
-  "ui_restore_all_in_new_window": {
-    "message": "列表还原至新窗口"
-  },
-  "ui_remove_list": {
-    "message": "删除列表"
-  },
-  "ui_pin": {
-    "message": "固定"
-  },
-  "ui_unpin": {
-    "message": "取消固定"
-  },
-  "ui_list": {
-    "message": "列表"
-  },
-  "ui_pinned": {
-    "message": "已固定"
-  },
-  "ui_duplicate": {
-    "message": "复制"
-  },
-  "ui_copy_link": {
-    "message": "复制链接"
-  },
-  "ui_copy_title": {
-    "message": "复制标题"
-  },
-  "ui_remove": {
-    "message": "删除"
-  },
-  "ui_open": {
-    "message": "打开"
-  },
-  "ui_create_issue": {
-    "message": "反馈问题"
-  },
-  "ui_options": {
-    "message": "选项"
-  },
-  "ui_options_behaviour": {
-    "message": "行为"
-  },
-  "ui_options_appearance": {
-    "message": "外观"
-  },
-  "ui_options_performance": {
-    "message": "性能"
-  },
-  "ui_options_sync": {
-    "message": "同步"
-  },
-  "ui_about": {
-    "message": "关于"
-  },
-  "ui_keyboard_shortcuts": {
-    "message": "键盘快捷键"
-  },
-  "ui_export_import": {
-    "message": "导出 / 导入"
-  },
-  "ui_github": {
-    "message": "代码仓库"
-  },
-  "ui_tab_list": {
-    "message": "标签页列表"
-  },
-  "ui_export": {
-    "message": "导出"
-  },
-  "ui_import": {
-    "message": "导入"
-  },
-  "ui_export_comp": {
-    "message": "导出 (兼容 OneTab)"
-  },
-  "ui_export_json": {
-    "message": "导出至 JSON"
-  },
-  "ui_save_as_file": {
-    "message": "保存为文件"
-  },
-  "ui_copy": {
-    "message": "复制"
-  },
-  "ui_copied": {
-    "message": "复制成功!"
-  },
-  "ui_import_from_file": {
-    "message": "导入文件"
-  },
-  "ui_import_comp": {
-    "message": "导入 (兼容 OneTab)"
-  },
-  "ui_import_json": {
-    "message": "从 JSON 中导入"
-  },
-  "ui_main_processing": {
-    "message": "处理中..."
-  },
-  "ui_main_error_occurred": {
-    "message": "发生了一些错误"
-  },
-  "ui_main_succeeded": {
-    "message": "成功！"
-  },
-  "ui_opt_changes_saved": {
-    "message": "修改已保存！"
-  },
-  "ui_title_pin_btn": {
-    "message": "固定列表"
-  },
-  "ui_title_up_btn": {
-    "message": "上移列表"
-  },
-  "ui_title_down_btn": {
-    "message": "下移列表"
-  },
-  "ui_save_to_gdrive": {
-    "message": "将列表保存至 Google Drive"
-  },
-  "ui_save_immediately": {
-    "message": "立即保存"
-  },
-  "ui_no_list": {
-    "message": "没有标签页"
-  },
-  "ui_no_list_tip": {
-    "message": "1. 选中你想保存的标签页</br>2. 右键点击扩展图标</br>3. 点击 \"保存选中的标签页\"<p class=\"body-2\">在其他设备使用过？ 授权同步服务可以自动恢复列表。</p>"
-  },
-  "ui_untitled": {
-    "message": "未命名"
-  },
-  "ui_updated_to_ver": {
-    "message": "IceTab 已更新至"
-  },
-  "ui_click_view_changelog": {
-    "message": "点击查看详细更新日志"
-  },
-  "ui_move_to": {
-    "message": "移动至"
-  },
-  "ui_a_new_list": {
-    "message": "(一个新列表)"
-  }
-}
-````
-
-## File: src/app/store/index.js
-````javascript
-import _ from 'lodash'
-import Vue from 'vue'
-import Vuex from 'vuex'
-import storage from '@/common/storage'
-import options from '@/common/options' // eslint-disable-line no-unused-vars
-// import boss from '@/common/service/boss' // Comment out this import
-import listManager from '@/common/listManager'
-import {sleep} from '@/common/utils'
-
-import lists from './lists'
-
-Vue.use(Vuex)
-
-export default new Vuex.Store({
-  strict: DEBUG,
-  state: {
-    opts: options.getDefaultOptions(),
-    hasToken: false,
-    drawer: true,
-    nightmode: false,
-    snackbar: { status: false, msg: '' },
-    scrollY: 0,
-    ...lists.state,
-  },
-  getters: {
-    ...lists.getters,
-  },
-  mutations: {
-    setOption(state, payload) {
-      if (!payload) return
-      for (const [k, v] of Object.entries(payload)) {
-        Vue.set(state.opts, k, v)
-      }
-      if ('defaultNightMode' in payload) {
-        state.nightmode = payload.defaultNightMode
-      }
-    },
-    setToken(state, payload) {
-      state.hasToken = payload
-    },
-    setDrawer(state, drawer) {
-      state.drawer = drawer
-    },
-    setNightmode(state, payload) {
-      state.nightmode = payload
-    },
-    setSnackbar(state, message) {
-      state.snackbar.msg = message
-      state.snackbar.status = true
-    },
-    closeSnackbar(state) {
-      state.snackbar.status = false
-    },
-    setScrollY(state, v) {
-      state.scrollY = v
-    },
-    ...lists.mutations,
-  },
-  actions: {
-    async initializeState({ commit, dispatch }) {
-      await listManager.init()
-      const loadedOptions = await storage.getOptions()
-      if (loadedOptions) {
-        commit('setOption', loadedOptions)
-      }
-      // Check for the 'context=popup' query parameter
-      const isPopup = new URLSearchParams(window.location.search).get('context') === 'popup'
-      if (isPopup) {
-        commit('setDrawer', false)
-      } else {
-        const drawer = await storage.get('drawer')
-        commit('setDrawer', _.defaultTo(drawer, true))
-      }
-      commit('setToken', false)
-      await dispatch('preloadLists')
-    },
-    async setAndSaveOption({ commit, state }, { key, value }) {
-      const newOpts = { ...state.opts, [key]: value }
-      commit('setOption', newOpts)
-      await storage.setOptions(newOpts)
-    },
-    async switchDrawer({ commit, state }, newState) {
-      // If newState is a boolean, use it. Otherwise, toggle the current state.
-      const finalState = typeof newState === 'boolean' ? newState : !state.drawer;
-      commit('setDrawer', finalState);
-      await storage.set({ drawer: finalState });
-    },
-    async switchNightmode({ dispatch, state }) {
-      const newNightmodeState = !state.nightmode
-      await dispatch('setAndSaveOption', { key: 'defaultNightMode', value: newNightmodeState })
-    },
-    async showSnackbar({commit}, message) {
-      commit('setSnackbar', message)
-      await sleep(2000)
-      commit('closeSnackbar')
-    },
-    ...lists.actions,
-  },
-  plugins: [
-    listManager.createVuexPlugin(),
-  ],
-})
-````
-
-## File: src/background/init.js
-````javascript
-/* eslint-disable */
-import _ from 'lodash'
-// import logger from '../common/logger' // The logger has been temporarily disabled for debugging
-import options from '../common/options'
-import storage from '../common/storage'
-import migrate from '../common/migrate'
-import boss from '../common/service/boss' // Keep import as it's commented out in boss.js
-import {normalizeList} from '../common/list'
-import commandHandler from './commandHandler'
-import messageHandler from './messageHandler'
-import listManager from '../common/listManager'
-import {setupContextMenus, dynamicDisableMenu, handleContextMenuClicked} from './contextMenus'
-import installedEventHandler from './installedEventHandler'
-import {updateBrowserAction, getBrowserActionHandler, getCoverBrowserAction} from './browserAction'
-
-import browser from 'webextension-polyfill'
-
-// Global variables for the service worker context
-let opts_global = {};
-let nightmode_global = false;
-let boss_token_global = null;
-let updateVersion_global = null;
-let drawer_global = false;
-
-const initOptions = async () => {
-  const opts = await storage.getOptions() || {}
-  const defaultOptions = options.getDefaultOptions()
-
-  if (_.keys(defaultOptions).some(key => !_.has(opts, key))) {
-    _.defaults(opts, defaultOptions)
-    await storage.setOptions(opts)
-  }
-
-  nightmode_global = opts.defaultNightMode
-  opts_global = opts;
-  const storedDrawer = await storage.get('drawer');
-  drawer_global = _.defaultTo(storedDrawer, true);
-  return opts
-}
-
-const storageChangedHandler = async changes => {
-  console.debug('[storage changed]', changes)
-  if (changes.boss_token) {
-    boss_token_global = changes.boss_token.newValue
-  }
-  if (changes.opts) {
-    opts_global = changes.opts.newValue || options.getDefaultOptions();
-    nightmode_global = opts_global.defaultNightMode;
-  }
-  if (changes.drawer) {
-    drawer_global = changes.newValue;
-  }
-
-  if (changes.lists) {
-    if (opts_global.disableDynamicMenu) return
-    await setupContextMenus(opts_global)
-  }
-}
-
-const tabsChangedHandler = async activeInfo => {
-  if (opts_global.disableDynamicMenu) return
-  const currentCoverBrowserAction = getCoverBrowserAction();
-  if (currentCoverBrowserAction) {
-    await currentCoverBrowserAction(activeInfo);
-  }
-  dynamicDisableMenu()
-}
-
-const fixDirtyData = async () => {
-  const unlock = await listManager.RWLock.lock()
-  const {lists} = await browser.storage.local.get('lists')
-  if (lists) {
-    const cleanLists = lists.filter(_.isPlainObject).map(normalizeList)
-    await browser.storage.local.set({lists: cleanLists})
-  }
-  await unlock()
-}
-
-const init = async () => {
-  try {
-    // await logger.init() // The logger has been temporarily disabled for debugging
-    await listManager.init()
-    const opts = await initOptions()
-    await updateBrowserAction(opts.browserAction)
-    await setupContextMenus(opts)
-
-    browser.runtime.onInstalled.addListener(async () => {
-      const opts = await initOptions();
-      await setupContextMenus(opts);
-    });
-    if (browser.commands) {
-      browser.commands.onCommand.addListener(commandHandler)
-    } else {
-      console.warn("browser.commands API is not available. Keyboard shortcuts may not work.");
-    }
-    browser.runtime.onMessageExternal.addListener(commandHandler)
-    browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-      if (msg.type === 'getGlobalState') {
-        if (msg.key === 'drawer') {
-          sendResponse({ [msg.key]: drawer_global });
-        } else if (msg.key === 'nightmode') {
-          sendResponse({ [msg.key]: nightmode_global });
-        }
-        return true;
-      }
-
-      if (msg.type === 'setGlobalState') {
-        (async () => {
-          if (msg.key === 'drawer') {
-            drawer_global = msg.value;
-            await storage.set({ drawer: msg.value });
-          } else if (msg.key === 'nightmode') {
-            nightmode_global = msg.value;
-            const currentOpts = await storage.getOptions();
-            currentOpts.defaultNightMode = msg.value;
-            await storage.setOptions(currentOpts);
-          }
-          sendResponse({ success: true });
-        })();
-        return true;
-      }
-
-      messageHandler(msg);
-    });
-    browser.runtime.onUpdateAvailable.addListener(detail => { updateVersion_global = detail.version })
-    browser.action.onClicked.addListener(async () => {
-      const handler = getBrowserActionHandler(opts_global.browserAction);
-      if (handler) {
-        await handler();
-      }
-    });
-    browser.contextMenus.onClicked.addListener(info => handleContextMenuClicked(info));
-    browser.tabs.onActivated.addListener(_.debounce(tabsChangedHandler, 200));
-    browser.storage.onChanged.addListener(storageChangedHandler);
-
-    await migrate()
-    await fixDirtyData()
-
-  } catch (error) {
-    console.error("A critical error occurred during background script initialization:", error);
-  }
-}
-
-export default init
-````
-
-## File: src/common/listManager.js
-````javascript
-import browser from 'webextension-polyfill'
-import {
-  SYNCED_LIST_PROPS,
-  END_FRONT,
-  END_BACKGROUND,
-  ADD_LIST,
-  UPDATE_LIST_BY_ID,
-  REMOVE_LIST_BY_ID,
-  CHANGE_LIST_ORDER,
-} from './constants'
-import {isBackground, sendMessage, Mutex} from './utils'
-
-const cache = { lists: null, ops: null }
-const RWLock = new Mutex()
-const getStorage = async () => {
-  const unlockRW = await RWLock.lock()
-  if (cache.lists && cache.ops) return cache
-  const {lists, ops} = await browser.storage.local.get(['lists', 'ops'])
-  cache.lists = lists || []
-  cache.ops = ops || []
-  await unlockRW()
-  return cache
-}
-const compressOps = ops => {
-  console.debug('[listManager] compress ops: (before)', ops)
-  const removed = []
-  const updated = {}
-  const finalOps = []
-  for (let i = ops.length - 1; i > -1; i -= 1) {
-    const op = ops[i]
-    // ignore all actions for the list if that list will be removed finally
-    if (op.args && op.args[0] && removed.includes(op.args[0]._id)
-      || typeof op.args[0] === 'string' && removed.includes(op.args[0])) continue
-
-    if (op.method === 'removeListById') {
-      removed.push(op.args[0])
-      finalOps.unshift(op)
-    } else if (op.method === 'updateListById') {
-      // keep the final result of every property if a list will be updated
-      const [listId, newList, time] = op.args
-      if (updated[listId]) {
-        for (const key in newList) {
-          if (key in updated[listId]) continue
-          updated[listId][key] = newList[key]
-        }
-        continue
-      } else {
-        updated[listId] = Object.assign({}, newList)
-        finalOps.unshift({method: 'updateListById', args: [listId, updated[listId], time]})
-      }
-    } else if (op.method === 'changeListOrderRelatively') {
-      // combine the value if a list is reordered continuously
-      if (i > 0 && ops[i - 1].method === 'changeListOrderRelatively' && op.args[0] === ops[i - 1].args[0]) {
-        ops[i - 1].args[1] += ops[i].args[1]
-      } else finalOps.unshift(op)
-    } else {
-      // do nothing if add a list
-      finalOps.unshift(op)
-    }
-  }
-  console.debug('[listManager] compress ops: (after)', finalOps)
-  return finalOps
-}
-
-const manager = {}
-// lists modifier (return true if need to add ops)
-manager.modifiers = {
-  [ADD_LIST](lists, [list]) {
-    if (~lists.findIndex(i => i._id === list._id)) return
-    lists.unshift(list)
-    return [list]
-  },
-  [UPDATE_LIST_BY_ID](lists, [listId, newList, time = Date.now()]) {
-    const normal = Object.keys(newList).some(k => SYNCED_LIST_PROPS.includes(k))
-    for (let i = 0; i < lists.length; i += 1) {
-      if (lists[i]._id !== listId) continue
-      const list = lists[i]
-      for (const [k, v] of Object.entries(newList)) {
-        list[k] = v
-      }
-      if (normal) list.updatedAt = time
-      return normal ? [listId, newList, time] : null
-    }
-  },
-  [REMOVE_LIST_BY_ID](lists, [listId]) {
-    const index = lists.findIndex(list => list._id === listId)
-    lists.splice(index, 1)
-    return [listId]
-  },
-  [CHANGE_LIST_ORDER](lists, [listId, diff]) {
-    const index = lists.findIndex(list => list._id === listId)
-    const [list] = lists.splice(index, 1)
-    lists.splice(index + diff, 0, list)
-    return [listId, diff]
-  },
-}
-
-// use myself throttle function to replace Lodash.throttle to make sure
-// this function cannot be executed concurrently
-const saveStorage = async (lists, ops) => {
-  const unlock = await RWLock.lock()
-  const data = {
-    lists,
-    ops: compressOps(ops)
-  }
-  await browser.storage.local.set(data)
-  cache.lists = cache.ops = null
-  await sendMessage({refresh: true})
-  await unlock()
-}
-// avoid getting storage at the same time
-const _modifyQueue = []
-const _startModifyWork = (lists, ops) => new Promise(resolve => {
-  while (_modifyQueue.length) {
-    const [method, args] = _modifyQueue.shift()
-    const opArgs = manager.modifiers[method](lists, args)
-    if (opArgs) ops.push({method, args: opArgs, time: Date.now()})
-  }
-  setTimeout(() => {
-    if (_modifyQueue.length) _startModifyWork(lists, ops).then(resolve)
-    else resolve()
-  }, 100)
-})
-
-let _working = false
-const applyChangesToStorage = async (method, args) => {
-  _modifyQueue.push([method, args])
-  // not need to start work if modify work is processing
-  if (_working) return
-  _working = true
-  const {lists, ops} = await getStorage()
-  await _startModifyWork(lists, ops)
-  // from here won't modify data if do not call start function
-  _working = false
-  await saveStorage(lists, ops)
-}
-const addEventListener = (receiveFrom, callback) => browser.runtime.onMessage.addListener(({listModifed, from}) => {
-  if (receiveFrom !== from || !listModifed) return
-  const {method, args} = listModifed
-  return callback(method, args)
-})
-const genMethods = isBackground => {
-  Object.keys(manager.modifiers).forEach(method => {
-    manager[method] = isBackground ? async (...args) => { // for background
-      console.debug('[list manager] modify list:', method, ...args)
-      await sendMessage({listModifed: {method, args}, from: END_BACKGROUND})
-      // no need to await changes applied for close tabs immediately
-      applyChangesToStorage(method, args)
-    } : async (...args) => { // for front end
-      console.debug('[list manager] call to modify list:', name, ...args)
-      await sendMessage({listModifed: {method, args}, from: END_FRONT})
-    }
-  })
-}
-manager.init = async () => {
-  if (manager.inited) return
-  manager.inited = true
-  const _isBackground = await isBackground()
-  if (_isBackground) await addEventListener(END_FRONT, applyChangesToStorage)
-  genMethods(_isBackground)
-}
-manager.mapMutations = () => {
-  const mutations = {}
-  Object.entries(manager.modifiers).forEach(([method, fn]) => {
-    mutations[method] = (state, payload) => fn(state.lists, payload)
-  })
-  mutations.receiveData = (state, {method, args}) => {
-    manager.modifiers[method](state.lists, args)
-  }
-  return mutations
-}
-manager.createVuexPlugin = () => store => {
-  addEventListener(END_BACKGROUND, (method, args) => {
-    store.commit('receiveData', {method, args})
-  })
-  browser.runtime.onMessage.addListener(({refreshed}) => {
-    if (refreshed && refreshed.success) store.dispatch('getLists')
-  })
-  store.subscribe(({type, payload}) => {
-    if (type in manager.modifiers) {
-      manager[type](...payload)
-    }
-  })
-}
-manager.RWLock = RWLock
-manager.isWorking = () => _working
-export default manager
-````
-
-## File: src/common/utils.js
-````javascript
-import _ from 'lodash'
-import __ from './i18n'
-import { formatDistanceToNow, format, isSameYear } from 'date-fns'
-import { enUS, zhCN } from 'date-fns/locale'
-import { COLORS } from './constants'
-import browser from 'webextension-polyfill'
-
-// Map your @@ui_locale to date-fns locale objects
-const dateFnsLocales = {
-  en: enUS,
-  zh_CN: zhCN,
-  de: zhCN, // Assuming 'de' maps to zhCN locale or needs a separate de locale from date-fns
-}
-
-const getDateFnsLocale = uiLocale => dateFnsLocales[uiLocale.split('-')[0]] || enUS
-
-export const formatTime = time => {
-  const date = new Date(time)
-  const now = new Date()
-  const locale = getDateFnsLocale(__('@@ui_locale'))
-
-  // If time difference is less than 1 hour (3600E3 milliseconds)
-  if (now.getTime() - time < 3600E3) {
-    return formatDistanceToNow(date, { addSuffix: true, locale })
-  }
-
-  const withYear = !isSameYear(date, now)
-  const formatString = `iii, MMMM do ${withYear ? 'yyyy' : ''}, HH:mm:ss`
-  return format(date, formatString, { locale })
-}
-export const one = fn => {
-  let executing = false
-  return async function onceAtSameTimeFunction(...args) {
-    if (executing) return
-    executing = true
-    let re
-    try {
-      re = await fn.apply(this, args) // eslint-disable-line no-invalid-this
-    } finally {
-      executing = false
-    }
-    return re
-  }
-}
-export const checkPermission = async permission => {
-  if (await browser.permissions.contains({ permissions: [permission] })) return true
-  return browser.permissions.request({ permissions: [permission] })
-}
-export const readFile = file => new Promise((resolve, reject) => {
-  const reader = new FileReader()
-  reader.onloadend = event => resolve(event.target.result)
-  reader.onerror = reject
-  reader.readAsText(file)
-})
-export const genObjectId = () => {
-  const timestamp = (new Date().getTime() / 1000 | 0).toString(16)
-  return timestamp + 'xxxxxxxxxxxxxxxx'.replace(/[x]/g, () => (Math.random() * 16 | 0).toString(16)).toLowerCase()
-}
-export const isBackground = () => typeof self.importScripts === 'function'
-
-export const formatSize = bytes => {
-  const sufixes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(1024))
-  return !bytes && '0 Bytes' || (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sufixes[i]
-}
-export const sleep = ms => new Promise(r => setTimeout(r, ms))
-
-export const getColorByHash = _.memoize(str => {
-  const hash = typeof str === 'string' ? str.split('').reduce((r, i) => i.charCodeAt(0) + r, 0) : 0
-  return COLORS[hash % COLORS.length]
-})
-
-export const timeout = (promise, ms) => Promise.race([
-  promise, new Promise((resolve, reject) => setTimeout(() => {
-    reject(new Error('promise timeout'))
-  }, ms))
-])
-
-export const compareVersion = (a, b) => {
-  if (a === b) return 0
-  const [ap, bp] = [a, b].map(i => i || '0').map(i => i.split('.').map(j => +j))
-  const len = Math.min(ap.length, bp.length)
-  for (let i = 0; i < len; i += 1) {
-    if (ap[i] !== bp[i]) return ap[i] - bp[i]
-  }
-  return ap.length - bp.length
-}
-
-export const sendMessage = async msg => {
-  try {
-    await browser.runtime.sendMessage(msg)
-  } catch (err) {
-    if (err.message === 'Could not establish connection. Receiving end does not exist.') {
-      return console.warn('error ignored', err.message)
-    }
-    throw err
-  }
-}
-
-export const throttle = (fn, ms) => {
-  let executing
-  let next
-  let nextArgs
-  let timeout
-  let lastTime
-  return async function throttled(...args) {
-    const now = Date.now()
-    if (now - lastTime < ms) {
-      next = true
-      nextArgs = args
-      if (timeout) clearTimeout(timeout)
-      timeout = setTimeout(() => {
-        throttled(...args)
-      })
-      return
-    }
-
-    if (executing) {
-      next = true
-      nextArgs = args
-      return
-    }
-
-    executing = true
-    lastTime = now
-
-    let re
-    try {
-      re = await fn.apply(this, args) // eslint-disable-line no-invalid-this
-    } finally {
-      executing = false
-      if (next) {
-        if (Date.now() - now > ms) {
-          next = false
-          if (timeout) clearTimeout(timeout)
-          throttled(...nextArgs)
-        }
-      }
-    }
-    return re
-  }
-}
-
-export class Mutex {
-  constructor() {
-    this._locking = Promise.resolve()
-    this._locks = 0
-  }
-
-  isLocked() {
-    return this._locks > 0
-  }
-
-  lock() {
-    this._locks += 1
-    let unlockNext
-    const willLock = new Promise(resolve => {
-      unlockNext = () => {
-        this._locks -= 1
-        resolve()
-      }
-    })
-    const willUnlock = this._locking.then(() => unlockNext)
-    this._locking = this._locking.then(() => willLock)
-    return willUnlock
-  }
-}
-
-export const getDomain = (url) => {
-  try {
-    const hostname = new URL(url).hostname;
-    return hostname.replace(/^www\./, '');
-  } catch (e) {
-    return url;
-  }
-};
-````
-
-## File: webpack.common.js
-````javascript
-/* eslint-disable */
-const webpack = require('webpack')
-const { merge } = require('webpack-merge')
-const CopyWebpackPlugin = require('copy-webpack-plugin')
-const { CleanWebpackPlugin } = require('clean-webpack-plugin')
-const HtmlWebpackPlugin = require('html-webpack-plugin')
-const sveltePreprocess = require('svelte-preprocess')
-const path = require('path')
-
-const isDevelopment = process.env.NODE_ENV === 'development';
-const mode = process.env.NODE_ENV || 'development'
-const PRODUCTION = mode !== 'development';
-
-const clientConfig = {
-  development: {
-    __CLIENT_ID__: '530831729511-eq8apt6dhjimbmdli90jp2ple0lfmn3l.apps.googleusercontent.com',
-    __DEV_CSP_SCRIPT__: '',
-    __DEV_CSP_CONNECT__: '',
-    __EXT_NAME__: 'IceTab (dev)',
-    __CONTENT_SCRIPTS_MATCHES__: process.env.MOZ ? '*://*/*' : 'http://127.0.0.1:8000/*',
-  },
-  production: {
-    __CLIENT_ID__: '530831729511-dclgvblhv7var13mvpjochb5f295a6vc.apps.googleusercontent.com',
-    __DEV_CSP_SCRIPT__: '',
-    __DEV_CSP_CONNECT__: '',
-    __EXT_NAME__: '__MSG_ext_name__',
-    __CONTENT_SCRIPTS_MATCHES__: 'https://boss.cnwangjie.com/*',
-  }
-}
-
-const resolve = (...paths) => path.join(__dirname, ...paths)
-const moz = process.env.MOZ
-
-module.exports = {
-  entry: {
-    app: './src/app/index.js',
-    background: './src/background/index.js',
-    content: './src/content.js',
-    gdrive_sandbox: './src/gdrive_sandbox.js',
-  },
-  output: {
-    filename: '[name].js',
-    path: path.resolve(__dirname, 'dist'),
-    publicPath: '/',
-    clean: true,
-  },
-  mode: mode,
-
-  plugins: [
-    new CleanWebpackPlugin(),
-
-    new webpack.DefinePlugin({
-      'process.env.NODE_ENV': JSON.stringify(mode),
-      'PRODUCTION': JSON.stringify(PRODUCTION),
-      'DEBUG': JSON.stringify(isDevelopment),
-      ...clientConfig[mode],
-    }),
-
-    new CopyWebpackPlugin({
-      patterns: [
-        {
-          from: 'src/manifest.json',
-          to: 'manifest.json',
-          // The broken transform function has been removed to ensure a clean copy.
-        },
-        { from: 'src/assets/icons', to: 'assets/icons' },
-        { from: 'src/_locales', to: '_locales' },
-        { from: 'src/gdrive_sandbox.html', to: 'gdrive_sandbox.html' },
-      ],
-    }),
-
-    new HtmlWebpackPlugin({
-      filename: 'popup.html',
-      template: 'src/app/index.html',
-      chunks: ['app'],
-      inject: true,
-      minify: PRODUCTION ? {
-        removeComments: true,
-        collapseWhitespace: true,
-        removeAttributeQuotes: true
-      } : false,
-    }),
-
-    new HtmlWebpackPlugin({
-      filename: 'index.html',
-      template: 'src/app/index.html',
-      chunks: ['app'],
-      excludeChunks: ['background', 'content', 'gdrive_sandbox'],
-      inject: true,
-      minify: PRODUCTION ? {
-        removeComments: true,
-        collapseWhitespace: true,
-        removeAttributeQuotes: true
-      } : false,
-    }),
-  ],
-  performance: {
-    hints: false,
-  },
-  optimization: {
-    splitChunks: {
-      cacheGroups: {
-        vendors: {
-          test: /[\\/]node_modules[\\/]/,
-          name: 'vendors',
-          chunks: (chunk) => {
-            return chunk.name === 'app';
-          }
-        },
-      },
-    },
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, 'src'),
-    },
-    extensions: ['.mjs', '.js', '.svelte', '.json'],
-    conditionNames: ['svelte', 'browser', 'import', 'default'],
-    mainFields: ['svelte', 'browser', 'module', 'main'],
-    fullySpecified: false
-  },
-  module: {
-    rules: [
-      {
-        test: /\.svelte$/,
-        use: {
-          loader: 'svelte-loader',
-          options: {
-            compilerOptions: {
-              dev: isDevelopment
-            },
-            emitCss: true,
-            hotReload: false
-          }
-        }
-      },
-      {
-        test: /\.svelte\.js$/,
-        use: {
-          loader: 'svelte-loader',
-          options: {
-            compilerOptions: {
-              dev: isDevelopment
-            },
-            emitCss: false,
-            hotReload: false
-          }
-        }
-      },
-      {
-        test: /\.css$/,
-        use: ['style-loader', 'css-loader']
-      },
-      {
-        test: /\.js$/,
-        exclude: /node_modules/,
-        use: {
-          loader: 'babel-loader',
-          options: {
-            presets: ['@babel/preset-env']
-          }
-        }
-      }
-    ]
-  },
-  stats: {
-    errorDetails: true,
-    reasons: true,
-    moduleTrace: true,
   }
 }
 ````
@@ -14287,6 +17403,183 @@ MIT LICENSE
 // }
 ````
 
+## File: webpack.common.js
+````javascript
+/* eslint-disable */
+const webpack = require('webpack')
+const { merge } = require('webpack-merge')
+const CopyWebpackPlugin = require('copy-webpack-plugin')
+const { CleanWebpackPlugin } = require('clean-webpack-plugin')
+const HtmlWebpackPlugin = require('html-webpack-plugin')
+const sveltePreprocess = require('svelte-preprocess')
+const path = require('path')
+
+const isDevelopment = process.env.NODE_ENV === 'development';
+const mode = process.env.NODE_ENV || 'development'
+const PRODUCTION = mode !== 'development';
+
+const clientConfig = {
+  development: {
+    __CLIENT_ID__: '530831729511-eq8apt6dhjimbmdli90jp2ple0lfmn3l.apps.googleusercontent.com',
+    __DEV_CSP_SCRIPT__: '',
+    __DEV_CSP_CONNECT__: '',
+    __EXT_NAME__: 'IceTab (dev)',
+    __CONTENT_SCRIPTS_MATCHES__: process.env.MOZ ? '*://*/*' : 'http://127.0.0.1:8000/*',
+  },
+  production: {
+    __CLIENT_ID__: '530831729511-dclgvblhv7var13mvpjochb5f295a6vc.apps.googleusercontent.com',
+    __DEV_CSP_SCRIPT__: '',
+    __DEV_CSP_CONNECT__: '',
+    __EXT_NAME__: '__MSG_ext_name__',
+    __CONTENT_SCRIPTS_MATCHES__: 'https://boss.cnwangjie.com/*',
+  }
+}
+
+const resolve = (...paths) => path.join(__dirname, ...paths)
+const moz = process.env.MOZ
+
+module.exports = {
+  entry: {
+    app: './src/app/index.js',
+    background: './src/background/index.js',
+    content: './src/content.js',
+    gdrive_sandbox: './src/gdrive_sandbox.js',
+  },
+  output: {
+    filename: '[name].js',
+    path: path.resolve(__dirname, 'dist'),
+    publicPath: '/',
+    clean: true,
+  },
+  mode: mode,
+
+  plugins: [
+    new CleanWebpackPlugin(),
+
+    new webpack.DefinePlugin({
+      'process.env.NODE_ENV': JSON.stringify(mode),
+      'PRODUCTION': JSON.stringify(PRODUCTION),
+      'DEBUG': JSON.stringify(isDevelopment),
+      ...clientConfig[mode],
+    }),
+
+    new CopyWebpackPlugin({
+      patterns: [
+        {
+          from: 'src/manifest.json',
+          to: 'manifest.json',
+          // The broken transform function has been removed to ensure a clean copy.
+        },
+        { from: 'src/assets', to: 'assets' },
+        { from: 'src/_locales', to: '_locales' },
+        { from: 'src/gdrive_sandbox.html', to: 'gdrive_sandbox.html' },
+      ],
+    }),
+
+    new HtmlWebpackPlugin({
+      filename: 'popup.html',
+      template: 'src/app/index.html',
+      chunks: ['app'],
+      inject: true,
+      minify: PRODUCTION ? {
+        removeComments: true,
+        collapseWhitespace: true,
+        removeAttributeQuotes: true
+      } : false,
+    }),
+
+    new HtmlWebpackPlugin({
+      filename: 'index.html',
+      template: 'src/app/index.html',
+      chunks: ['app'],
+      excludeChunks: ['background', 'content', 'gdrive_sandbox'],
+      inject: true,
+      minify: PRODUCTION ? {
+        removeComments: true,
+        collapseWhitespace: true,
+        removeAttributeQuotes: true
+      } : false,
+    }),
+  ],
+  performance: {
+    hints: false,
+  },
+  optimization: {
+    splitChunks: {
+      cacheGroups: {
+        vendors: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'vendors',
+          chunks: (chunk) => {
+            return chunk.name === 'app';
+          }
+        },
+      },
+    },
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
+    extensions: ['.mjs', '.js', '.svelte', '.json'],
+    conditionNames: ['svelte', 'browser', 'import', 'default'],
+    mainFields: ['svelte', 'browser', 'module', 'main'],
+    fullySpecified: false
+  },
+  module: {
+    rules: [
+      {
+        test: /\.svelte$/,
+        use: {
+          loader: 'svelte-loader',
+          options: {
+            compilerOptions: {
+              dev: isDevelopment,
+              runes: true,
+            },
+            emitCss: true,
+            hotReload: false
+          }
+        }
+      },
+      {
+        test: /\.svelte\.js$/,
+        use: {
+          loader: 'svelte-loader',
+          options: {
+            compilerOptions: {
+              dev: isDevelopment,
+              runes: true,
+            },
+            emitCss: false,
+            hotReload: false
+          }
+        }
+      },
+      {
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader']
+      },
+      {
+        test: /\.js$/,
+        exclude: /node_modules/,
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-env']
+          }
+        }
+      }
+    ]
+  },
+  stats: {
+    errorDetails: true,
+    reasons: true,
+    moduleTrace: true,
+  }
+}
+````
+
 ## File: package.json
 ````json
 {
@@ -14299,12 +17592,14 @@ MIT LICENSE
   "license": "MIT",
   "scripts": {
     "dev": "cross-env NODE_ENV=development webpack --config webpack.dev.js --watch",
+    "serve": "cross-env NODE_ENV=development webpack serve --config webpack.serve.js",
     "dev:moz": "cross-env MOZ=1 npm run dev",
     "build": "cross-env NODE_ENV=production webpack --config webpack.prod.js",
     "postbuild": "npm run package",
-    "package": "rm -f dist.zip && cd dist && zip -r ../dist.zip ./* -x *.map",
+    "package": "cd dist && powershell Compress-Archive -Path * -DestinationPath ../dist.zip -Force",
     "lint": "eslint src --ext js",
-    "prebuild": "npm run lint"
+    "prebuild": "npm run lint",
+    "validate": "bash scripts/validate-build.sh"
   },
   "dependencies": {
     "date-fns": "^2.30.0",
@@ -14324,7 +17619,6 @@ MIT LICENSE
     "@cnwangjie/eslint-config": "^1.3.0",
     "@sveltejs/vite-plugin-svelte": "^3.1.2",
     "babel-loader": "^10.0.0",
-    "babel-plugin-lodash": "^3.3.4",
     "clean-webpack-plugin": "^4.0.0",
     "copy-webpack-plugin": "^13.0.1",
     "cross-env": "^7.0.3",
@@ -14345,6 +17639,7 @@ MIT LICENSE
     "terser-webpack-plugin": "^5.3.10",
     "webpack": "^5.99.9",
     "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^5.2.3",
     "webpack-merge": "^5.10.0"
   },
   "sideEffects": [

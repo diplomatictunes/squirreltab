@@ -98,12 +98,7 @@ export const download = async () => {
 }
 
 export const health = async () => {
-  const { baseUrl } = await getSettings()
-  const response = await fetch(`${baseUrl}/health`)
-  if (!response.ok) {
-    throw new SyncError(`Health check failed (${response.status})`, { code: 'server', status: response.status })
-  }
-  return response.json()
+  return fetchData('/health', 'GET')
 }
 
 export const AI = {

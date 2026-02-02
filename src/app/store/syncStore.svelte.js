@@ -35,6 +35,31 @@ const mapRemoteList = remote =>
 
 let pendingPayload = null
 let retryTimer = null
+let autoSyncTimer = null
+
+const isAutoSyncEnabled = opts => opts?.autoSyncEnabled !== false
+const getAutoSyncIntervalMs = opts => {
+  const intervalSeconds = Number(opts?.autoSyncInterval)
+  if (!Number.isFinite(intervalSeconds) || intervalSeconds <= 0) return null
+  return intervalSeconds * 1000
+}
+
+const clearAutoSyncTimer = () => {
+  if (!autoSyncTimer) return
+  clearInterval(autoSyncTimer)
+  autoSyncTimer = null
+}
+
+const setupAutoSyncTimer = () => {
+  clearAutoSyncTimer()
+  if (!isAutoSyncEnabled(state.opts)) return
+  const intervalMs = getAutoSyncIntervalMs(state.opts)
+  if (!intervalMs) return
+  autoSyncTimer = setInterval(() => {
+    if (!state.initialized) return
+    scheduleSync('auto-interval')
+  }, intervalMs)
+}
 
 let state = $state({
   lists: [],
@@ -143,6 +168,7 @@ const debouncedPush = _.debounce(() => {
 
 const scheduleSync = (reason = 'change', { immediate = false, listsOverride = null, signatureOverride = null, force = false } = {}) => {
   if (!state.initialized) return
+  if (!force && !isAutoSyncEnabled(state.opts)) return
   const lists = listsOverride || $state.snapshot(state.lists)
   const signature = signatureOverride || buildSignature(lists)
   if (!force && signature === state.lastSyncedSignature) return
@@ -164,6 +190,7 @@ const scheduleSync = (reason = 'change', { immediate = false, listsOverride = nu
 }
 
 const hydrateFromRemote = async () => {
+  if (!isAutoSyncEnabled(state.opts)) return
   state.syncing = true
   state.syncPhase = SYNC_PHASES.SYNCING
   logSyncEvent('hydrate_started')
@@ -261,7 +288,7 @@ const initStore = async (retries = 3) => {
     state.lastSyncSuccess = null
     state.localOnly = false
     state.syncError = null
-    state.syncPhase = SYNC_PHASES.IDLE
+    state.syncPhase = isAutoSyncEnabled(state.opts) ? SYNC_PHASES.IDLE : SYNC_PHASES.NEVER_SYNCED
   } catch (error) {
     console.error('[SquirrlTab] Failed to initialize store:', error)
     if (retries > 0) {
@@ -277,7 +304,10 @@ const initStore = async (retries = 3) => {
   } finally {
     if (shouldFinalize) {
       state.initialized = true
-      hydrateFromRemote()
+      setupAutoSyncTimer()
+      if (isAutoSyncEnabled(state.opts)) {
+        hydrateFromRemote()
+      }
     }
   }
 }
@@ -294,6 +324,7 @@ browser.storage.onChanged.addListener((changes, area) => {
   if (changes.opts) {
     state.opts = changes.opts.newValue || {}
     console.log('[SquirrlTab] Options updated from storage')
+    setupAutoSyncTimer()
   }
 })
 

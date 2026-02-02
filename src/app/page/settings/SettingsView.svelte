@@ -9,7 +9,7 @@
   let settings = $state({
     syncBaseUrl: "",
     syncApiKey: "",
-    autoSyncEnabled: true,
+    autoSyncEnabled: false,
     autoSyncInterval: 300, // seconds
     confirmBeforeRestore: true,
     defaultRestoreBehavior: "current-window", // "current-window" | "new-window"
@@ -30,7 +30,7 @@
     if (opts.opts) {
       settings.syncBaseUrl = opts.opts.syncBaseUrl || "http://localhost:8000";
       settings.syncApiKey = opts.opts.syncApiKey || "";
-      settings.autoSyncEnabled = opts.opts.autoSyncEnabled ?? true;
+      settings.autoSyncEnabled = opts.opts.autoSyncEnabled ?? false;
       settings.autoSyncInterval = opts.opts.autoSyncInterval || 300;
       settings.confirmBeforeRestore = opts.opts.confirmBeforeRestore ?? true;
       settings.defaultRestoreBehavior = opts.opts.defaultRestoreBehavior || "current-window";
@@ -111,7 +111,7 @@
     
     settings.syncBaseUrl = "http://localhost:8000";
     settings.syncApiKey = "";
-    settings.autoSyncEnabled = true;
+    settings.autoSyncEnabled = false;
     settings.autoSyncInterval = 300;
     settings.confirmBeforeRestore = true;
     settings.defaultRestoreBehavior = "current-window";

@@ -219,6 +219,20 @@ export const getOptionsList = () => [
     new: '1.4.1',
   },
   {
+    cate: cate.BEHAVIOUR,
+    name: 'autoSyncEnabled',
+    type: Boolean,
+    default: false,
+    new: '1.4.1',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'autoSyncInterval',
+    type: Number,
+    default: 300,
+    new: '1.4.1',
+  },
+  {
     cate: cate.APPEARANCE,
     name: 'enableSearch',
     type: Boolean,

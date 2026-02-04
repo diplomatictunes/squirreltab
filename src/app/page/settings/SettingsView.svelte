@@ -2,8 +2,22 @@
   import browser from "webextension-polyfill";
   import { syncStore } from "../../store/syncStore.svelte.js";
   import CustomSync from "@/common/service/custom-sync";
+  import optionsCatalog from "@/common/options";
   
   let { onBack } = $props();
+  
+  const canonicalOptionKeys = Object.keys(optionsCatalog.getDefaultOptions());
+  // Only persist canonical option keys so storage never accrues unsupported drift.
+  const stripUnsupportedOptionKeys = raw => {
+    if (!raw) return {};
+    const sanitized = {};
+    for (const key of canonicalOptionKeys) {
+      if (Object.prototype.hasOwnProperty.call(raw, key)) {
+        sanitized[key] = raw[key];
+      }
+    }
+    return sanitized;
+  };
   
   // Settings state
   let settings = $state({
@@ -11,9 +25,6 @@
     syncApiKey: "",
     autoSyncEnabled: false,
     autoSyncInterval: 300, // seconds
-    confirmBeforeRestore: true,
-    defaultRestoreBehavior: "current-window", // "current-window" | "new-window"
-    deleteUnpinnedOnRestore: true,
   });
   
   let saveStatus = $state(null); // "saving" | "success" | "error"
@@ -27,30 +38,24 @@
   
   async function loadSettings() {
     const opts = await browser.storage.local.get("opts");
-    if (opts.opts) {
-      settings.syncBaseUrl = opts.opts.syncBaseUrl || "http://localhost:8000";
-      settings.syncApiKey = opts.opts.syncApiKey || "";
-      settings.autoSyncEnabled = opts.opts.autoSyncEnabled ?? false;
-      settings.autoSyncInterval = opts.opts.autoSyncInterval || 300;
-      settings.confirmBeforeRestore = opts.opts.confirmBeforeRestore ?? true;
-      settings.defaultRestoreBehavior = opts.opts.defaultRestoreBehavior || "current-window";
-      settings.deleteUnpinnedOnRestore = opts.opts.deleteUnpinnedOnRestore ?? true;
-    }
+    const storedOpts = stripUnsupportedOptionKeys(opts.opts);
+    settings.syncBaseUrl = storedOpts.syncBaseUrl || "http://localhost:8000";
+    settings.syncApiKey = storedOpts.syncApiKey || "";
+    settings.autoSyncEnabled = storedOpts.autoSyncEnabled ?? false;
+    settings.autoSyncInterval = storedOpts.autoSyncInterval || 300;
   }
   
   async function saveSettings() {
     saveStatus = "saving";
     try {
       const opts = await browser.storage.local.get("opts");
+      const canonicalExisting = stripUnsupportedOptionKeys(opts.opts);
       const updatedOpts = {
-        ...(opts.opts || {}),
+        ...canonicalExisting,
         syncBaseUrl: settings.syncBaseUrl.trim(),
         syncApiKey: settings.syncApiKey.trim(),
         autoSyncEnabled: settings.autoSyncEnabled,
         autoSyncInterval: settings.autoSyncInterval,
-        confirmBeforeRestore: settings.confirmBeforeRestore,
-        defaultRestoreBehavior: settings.defaultRestoreBehavior,
-        deleteUnpinnedOnRestore: settings.deleteUnpinnedOnRestore,
       };
       
       await browser.storage.local.set({ opts: updatedOpts });
@@ -75,8 +80,9 @@
     
     try {
       const opts = await browser.storage.local.get("opts");
+      const canonicalExisting = stripUnsupportedOptionKeys(opts.opts);
       const tempOpts = {
-        ...(opts.opts || {}),
+        ...canonicalExisting,
         syncBaseUrl: settings.syncBaseUrl.trim(),
         syncApiKey: settings.syncApiKey.trim(),
       };
@@ -113,9 +119,6 @@
     settings.syncApiKey = "";
     settings.autoSyncEnabled = false;
     settings.autoSyncInterval = 300;
-    settings.confirmBeforeRestore = true;
-    settings.defaultRestoreBehavior = "current-window";
-    settings.deleteUnpinnedOnRestore = true;
   }
 </script>
 

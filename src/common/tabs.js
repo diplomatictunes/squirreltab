@@ -2,6 +2,7 @@ import storage from './storage'
 import {createNewTabList} from './list'
 import listManager from './listManager'
 import {ILLEGAL_URLS} from './constants'
+import {Mutex} from './utils'
 
 
 const getAllInWindow = windowId => chrome.tabs.query({windowId})
@@ -62,6 +63,7 @@ const groupTabsInCurrentWindow = async () => {
 }
 
 const isLegalURL = url => ILLEGAL_URLS.every(prefix => !url.startsWith(prefix))
+const stashMutex = new Mutex() // serialize stash flows so concurrent triggers cannot interleave
 const storeTabs = async (tabs, listIndex) => {
   const appUrl = chrome.runtime.getURL('')
   tabs = tabs.filter(i => !i.url.startsWith(appUrl))
@@ -71,23 +73,29 @@ const storeTabs = async (tabs, listIndex) => {
   if (opts.excludeIllegalURL) tabs = tabs.filter(i => isLegalURL(i.url))
   if (tabs.length === 0) return
 
-  // 🔹 always start from persisted state
-  const lists = await storage.getLists()
+  const release = await stashMutex.lock()
+  try {
+    // Always hydrate from storage inside the lock so that stash operations cannot interleave.
+    const lists = await storage.getLists()
 
-  if (listIndex == null) {
-    const newList = createNewTabList({ tabs })
-    if (opts.pinNewList) newList.pinned = true
-    lists.unshift(newList)
-  } else {
-    const list = lists[listIndex]
-    tabs.forEach(tab => list.tabs.push(tab))
+    if (listIndex == null) {
+      const newList = createNewTabList({ tabs })
+      if (opts.pinNewList) newList.pinned = true
+      lists.unshift(newList)
+    } else {
+      const list = lists[listIndex]
+      tabs.forEach(tab => list.tabs.push(tab))
+    }
+
+    // Persist first; tab removal only proceeds after a successful write.
+    await storage.setLists(lists)
+
+    return chrome.tabs.remove(tabs.map(i => i.id))
+  } finally {
+    await release()
   }
-
-  // 🔴 THIS is the critical line
-  await storage.setLists(lists)
-
-  return chrome.tabs.remove(tabs.map(i => i.id))
 }
+
 const storeCurrentTab = async listIndex => {
   const tabs = await chrome.tabs.query({active: true, currentWindow: true})
   if (!tabs || tabs.length === 0) throw new Error('No active tab to stash')

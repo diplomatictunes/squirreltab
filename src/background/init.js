@@ -91,8 +91,14 @@ const init = async () => {
       console.log("Commands API not available, skipping initialization of shortcuts.");
   }
     chrome.runtime.onMessageExternal.addListener(commandHandler)
-    chrome.runtime.onMessage.addListener(msg => {
-      messageHandler(msg)
+    chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
+      // Guard dispatch so malformed payloads or handler bugs cannot crash the service worker.
+      try {
+        return await messageHandler(msg, sender, sendResponse)
+      } catch (error) {
+        console.error('[SquirrlTab] message dispatch failed', { msg, error })
+        return false
+      }
     });
     chrome.runtime.onUpdateAvailable.addListener(detail => { updateVersion_global = detail.version })
     chrome.action.onClicked.addListener(async () => {

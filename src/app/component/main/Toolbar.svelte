@@ -1,7 +1,30 @@
 <script>
   import SyncStatusBadge from "../sync/SyncStatusBadge.svelte";
+  import { syncStore } from "../../store/syncStore.svelte.js";
 
   let { onToggleDrawer, onOpenSettings } = $props();
+
+  const syncMeta = $derived(syncStore.syncStatus);
+  let lastNotifiedError = $state(null);
+
+  $effect(() => {
+    if (syncMeta.error && syncMeta.lastSyncSuccess === false) {
+      const token = `${syncMeta.error.code}:${syncMeta.error.phase}`;
+      if (token !== lastNotifiedError) {
+        lastNotifiedError = token;
+        const message =
+          syncMeta.error.code === "offline"
+            ? "Sync offline. Changes stay on this device."
+            : syncMeta.error.code === "auth"
+              ? "Sync auth failed. Check your API key."
+              : "Sync failed. Working locally.";
+        // Surface existing failure state via the shared snackbar without changing sync behavior.
+        syncStore.updateSnackbar(message);
+      }
+    } else if (!syncMeta.error || syncMeta.lastSyncSuccess === true) {
+      lastNotifiedError = null;
+    }
+  });
 </script>
 
 <nav class="toolbar">

@@ -218,6 +218,8 @@ const hydrateFromRemote = async () => {
       state.localOnly = false
       state.syncError = null
       await storage.setLists(normalizedRemote)
+      console.log('[hydrate] setting lists:', normalizedRemote.length)
+      state.lists = normalizedRemote
       state.lastSyncedAt = Date.now()
       state.syncPhase = SYNC_PHASES.SYNCED
       logSyncEvent('hydrate_success', {

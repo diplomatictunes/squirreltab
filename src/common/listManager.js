@@ -11,11 +11,40 @@ import {isBackground, sendMessage, Mutex} from './utils'
 
 const cache = { lists: null, ops: null }
 const RWLock = new Mutex()
+const isObject = value => value && typeof value === 'object'
+const isValidTab = tab => isObject(tab) && typeof tab.url === 'string'
+const isValidList = list => isObject(list) && typeof list._id === 'string' && Array.isArray(list.tabs) && list.tabs.every(isValidTab)
+// Validate list collections at storage boundaries so corrupt state never reaches persistence.
+const ensureValidLists = (lists, context) => {
+  if (!Array.isArray(lists)) {
+    const error = new Error(`[listManager] invalid lists state (${context}): expected array`)
+    console.error(error.message, {lists})
+    throw error
+  }
+  for (let i = 0; i < lists.length; i += 1) {
+    const list = lists[i]
+    if (!isValidList(list)) {
+      const error = new Error(`[listManager] invalid list entry (${context}) at index ${i}`)
+      console.error(error.message, {list})
+      throw error
+    }
+  }
+}
 const getStorage = async () => {
   const unlockRW = await RWLock.lock()
-  if (cache.lists && cache.ops) return cache
+  if (cache.lists && cache.ops) {
+    await unlockRW()
+    return cache
+  }
   const {lists, ops} = await chrome.storage.local.get(['lists', 'ops'])
-  cache.lists = lists || []
+  const hydratedLists = lists || []
+  try {
+    ensureValidLists(hydratedLists, 'storage read')
+  } catch (error) {
+    await unlockRW()
+    throw error
+  }
+  cache.lists = hydratedLists
   cache.ops = ops || []
   await unlockRW()
   return cache
@@ -102,6 +131,7 @@ const saveStorage = async (lists, ops) => {
     lists,
     ops: compressOps(ops)
   }
+  ensureValidLists(lists, 'pre-save')
   await chrome.storage.local.set(data)
   cache.lists = cache.ops = null
   await sendMessage({refresh: true})

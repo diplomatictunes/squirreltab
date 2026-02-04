@@ -12,7 +12,7 @@ export const getBrowserActionHandler = (action) => {
   const handlers = {
     'store-selected': tabs.storeSelectedTabs,
     'store-all': tabs.storeAllTabs,
-    'show-list': tabs.openTabLists,
+    'show-list': tabs.openlists,
   }
   return handlers[action] || null
 }

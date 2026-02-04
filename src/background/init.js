@@ -4,7 +4,6 @@ import tabs from '../common/tabs'
 import options from '../common/options'
 import storage from '../common/storage'
 import migrate from '../common/migrate'
-import boss from '../common/service/boss' // Keep import as it's commented out in boss.js
 import { normalizeList } from '../common/list'
 import commandHandler from './commandHandler'
 import messageHandler from './messageHandler'
@@ -16,10 +15,7 @@ import { updateBrowserAction, getBrowserActionHandler, getCoverBrowserAction } f
 
 // Global variables for the service worker context
 let opts_global = {};
-let nightmode_global = false;
-let boss_token_global = null;
 let updateVersion_global = null;
-let drawer_global = false;
 
 const initOptions = async () => {
   const opts = await storage.getOptions() || {}
@@ -30,24 +26,14 @@ const initOptions = async () => {
     await storage.setOptions(opts)
   }
 
-  nightmode_global = opts.defaultNightMode
   opts_global = opts;
-  const storedDrawer = await storage.get('drawer');
-  drawer_global = _.defaultTo(storedDrawer, true);
   return opts
 }
 
 const storageChangedHandler = async changes => {
   console.debug('[storage changed]', changes)
-  if (changes.boss_token) {
-    boss_token_global = changes.boss_token.newValue
-  }
   if (changes.opts) {
     opts_global = changes.opts.newValue || options.getDefaultOptions();
-    nightmode_global = opts_global.defaultNightMode;
-  }
-  if (changes.drawer) {
-    drawer_global = changes.newValue;
   }
 
   if (changes.lists) {
@@ -105,33 +91,8 @@ const init = async () => {
       console.log("Commands API not available, skipping initialization of shortcuts.");
   }
     chrome.runtime.onMessageExternal.addListener(commandHandler)
-    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-      if (msg.type === 'getGlobalState') {
-        if (msg.key === 'drawer') {
-          sendResponse({ [msg.key]: drawer_global });
-        } else if (msg.key === 'nightmode') {
-          sendResponse({ [msg.key]: nightmode_global });
-        }
-        return true;
-      }
-
-      if (msg.type === 'setGlobalState') {
-        (async () => {
-          if (msg.key === 'drawer') {
-            drawer_global = msg.value;
-            await storage.set({ drawer: msg.value });
-          } else if (msg.key === 'nightmode') {
-            nightmode_global = msg.value;
-            const currentOpts = await storage.getOptions();
-            currentOpts.defaultNightMode = msg.value;
-            await storage.setOptions(currentOpts);
-          }
-          sendResponse({ success: true });
-        })();
-        return true;
-      }
-
-      messageHandler(msg);
+    chrome.runtime.onMessage.addListener(msg => {
+      messageHandler(msg)
     });
     chrome.runtime.onUpdateAvailable.addListener(detail => { updateVersion_global = detail.version })
     chrome.action.onClicked.addListener(async () => {

@@ -35,7 +35,6 @@ module.exports = {
   entry: {
     app: './src/app/index.js',
     background: './src/background/index.js',
-    content: './src/content.js',
     gdrive_sandbox: './src/gdrive_sandbox.js',
   },
   output: {

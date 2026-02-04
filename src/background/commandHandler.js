@@ -5,7 +5,7 @@ const commands = {
   'store-all-tabs': tabs.storeAllTabs,
   'store-all-in-all-windows': tabs.storeAllTabInAllWindows,
   'restore-lastest-list': tabs.restoreLastestList,
-  'open-lists': tabs.openTabLists,
+  'open-lists': tabs.openlists,
 }
 
 const commandHandler = command => {

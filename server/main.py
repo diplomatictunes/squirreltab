@@ -44,7 +44,7 @@ class TabItem(BaseModel):
     favIconUrl: Optional[str] = ""
     pinned: Optional[bool] = None
 
-class TabListSchema(BaseModel):
+class listschema(BaseModel):
     remote_id: str
     title: str
     tabs: List[TabItem]
@@ -56,7 +56,7 @@ class TabListSchema(BaseModel):
     updated_at: Optional[int] = None
 
 class FullSyncPayload(BaseModel):
-    lists: List[TabListSchema] = []
+    lists: List[listschema] = []
 
 # Helpers
 def epoch_ms_to_dt(value: Optional[int]) -> datetime.datetime:
@@ -139,7 +139,7 @@ def pull_tabs(user: User = Depends(get_user_by_api_key), db: Session = Depends(g
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.post("/sync/push")
-def push_single_list(data: TabListSchema, user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
+def push_single_list(data: listschema, user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
     # The extension sends a single list object here
     existing = db.query(TabList).filter(
         TabList.remote_id == data.remote_id, 

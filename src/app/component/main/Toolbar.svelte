@@ -25,9 +25,6 @@
       <i class="fas fa-cog"></i>
     </button>
 
-    <button class="icon-btn" title="More options">
-      <i class="fas fa-ellipsis-v"></i>
-    </button>
   </div>
 </nav>
 

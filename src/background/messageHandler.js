@@ -1,6 +1,5 @@
 import tabs from '../common/tabs'
 import storage from '../common/storage'
-// import boss from '../common/service/boss' // Keep import commented if you previously uncommented it for boss.js
 import { sendMessage } from '../common/utils'
 import listManager from '../common/listManager'
 import { setupContextMenus } from './contextMenus'
@@ -103,14 +102,6 @@ const messageHandler = async msg => {
   if (msg.storeInto) {
     tabs.storeSelectedTabs(msg.storeInto.index)
   }
-  /*
-  if (msg.login) {
-    boss.login(msg.login.token)
-  }
-  if (msg.refresh) {
-    boss.refresh()
-  }
-  */
     if (msg.import) {
     const { lists } = msg.import
     lists.forEach(list => listManager.addList(list))

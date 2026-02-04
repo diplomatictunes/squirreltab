@@ -212,50 +212,6 @@
       {/if}
     </section>
     
-    <!-- Restore Behavior Section -->
-    <section class="settings-section">
-      <div class="section-header">
-        <i class="fas fa-folder-open section-icon"></i>
-        <h2>Restore Behavior</h2>
-      </div>
-      
-      <div class="setting-group">
-        <label class="setting-checkbox">
-          <input
-            type="checkbox"
-            bind:checked={settings.confirmBeforeRestore}
-          />
-          <span>Confirm before restoring</span>
-          <span class="checkbox-hint">Show confirmation dialog when restoring stashes</span>
-        </label>
-      </div>
-      
-      <div class="setting-group">
-        <label for="restore-target" class="setting-label">
-          Default restore location
-        </label>
-        <select
-          id="restore-target"
-          class="setting-select"
-          bind:value={settings.defaultRestoreBehavior}
-        >
-          <option value="current-window">Current window</option>
-          <option value="new-window">New window</option>
-        </select>
-      </div>
-      
-      <div class="setting-group">
-        <label class="setting-checkbox">
-          <input
-            type="checkbox"
-            bind:checked={settings.deleteUnpinnedOnRestore}
-          />
-          <span>Delete unpinned stashes after restore</span>
-          <span class="checkbox-hint">Pinned stashes are always kept after restore</span>
-        </label>
-      </div>
-    </section>
-    
     <!-- About Section -->
     <section class="settings-section">
       <div class="section-header">

@@ -8,10 +8,10 @@ const getAllInWindow = windowId => chrome.tabs.query({windowId})
 
 const APP_TAB_ID_KEY = 'appTabIds' // Define a key for storing app tab IDs in storage
 
-const openTabLists = async () => {
+const openlists = async () => {
   const currentWindow = await chrome.windows.getCurrent()
   const windowId = currentWindow.id
-  const tabListsUrl = chrome.runtime.getURL('index.html#/app/')
+  const listsUrl = chrome.runtime.getURL('index.html#/app/')
 
   // Retrieve stored appTabIds from local storage
   const storedData = await chrome.storage.local.get(APP_TAB_ID_KEY)
@@ -20,7 +20,7 @@ const openTabLists = async () => {
   if (windowId in appTabIds) {
     const tabs = await getAllInWindow(windowId)
     const tab = tabs.find(t => t.id === appTabIds[windowId])
-    if (tab && tab.url.startsWith(tabListsUrl)) {
+    if (tab && tab.url.startsWith(listsUrl)) {
       // If the tab exists and is the correct URL, activate it
       return chrome.tabs.update(tab.id, { active: true })
     }
@@ -30,7 +30,7 @@ const openTabLists = async () => {
   }
 
   // Create a new tab and store its ID
-  const createdTab = await chrome.tabs.create({ url: tabListsUrl })
+  const createdTab = await chrome.tabs.create({ url: listsUrl })
   appTabIds[windowId] = createdTab.id
   await chrome.storage.local.set({ [APP_TAB_ID_KEY]: appTabIds })
 }
@@ -101,21 +101,21 @@ const storeTwoSideTabs = async listIndex => storeTabs((await groupTabsInCurrentW
 const storeSelectedTabs = async listIndex => {
   const tabs = await getSelectedTabs()
   const allTabs = await getAllTabsInCurrentWindow()
-  if (tabs.length === allTabs.length) await openTabLists()
+  if (tabs.length === allTabs.length) await openlists()
   return storeTabs(tabs, listIndex)
 }
 
 const storeAllTabs = async listIndex => {
   const tabs = await getAllTabsInCurrentWindow()
   const opts = await storage.getOptions()
-  if (opts.openTabListNoTab) await openTabLists()
+  if (opts.openTabListNoTab) await openlists()
   return storeTabs(tabs, listIndex)
 }
 
 const storeAllTabInAllWindows = async () => {
   const windows = await chrome.windows.getAll()
   const opts = await storage.getOptions()
-  if (opts.openTabListNoTab) await openTabLists()
+  if (opts.openTabListNoTab) await openlists()
   const tasks = []
   for (const window of windows) {
     const task = getAllInWindow(window.id).then(storeTabs)
@@ -176,6 +176,6 @@ export default {
   restoreList,
   restoreListInNewWindow,
   restoreLastestList,
-  openTabLists,
+  openlists,
   openAboutPage,
 }

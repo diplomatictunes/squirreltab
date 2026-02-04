@@ -108,7 +108,6 @@ src/common/options.js
 src/common/runtimeContext.js
 src/common/service/boss.js
 src/common/service/custom-sync.js
-src/common/service/gdrive.js
 src/common/storage.js
 src/common/sync-logger.js
 src/common/tab.js
@@ -117,8 +116,6 @@ src/common/tracker.js
 src/common/utils.js
 src/content.js
 src/exchanger.js
-src/gdrive_sandbox.html
-src/gdrive_sandbox.js
 src/manifest.json
 src/mock/index.js
 vue.config.js
@@ -129,37 +126,6 @@ webpack.serve.js
 ```
 
 # Files
-
-## File: server.js
-````javascript
-const http = require('http');
-
-const server = http.createServer((req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
-
-  // The extension specifically looks for these properties
-  const mockResponse = {
-    status: 'success',
-    updated_at: new Date().toISOString(),
-    lists: [] 
-  };
-
-  res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify(mockResponse));
-});
-
-server.listen(8000, () => {
-  console.log('Sync server active on port 8000');
-});
-````
 
 ## File: src/common/autoreload.js
 ````javascript
@@ -202,6 +168,25 @@ export default autoreload
 export default (...args) => chrome.i18n.getMessage(...args)
 ````
 
+## File: src/common/listManager.d.ts
+````typescript
+declare class ListManager {
+  addList(list: object): Promise<void>
+  updateListById(listId: string, list: object, time?: number): Promise<void>
+  removeListById(listId: string): Promise<void>
+  changeListOrderRelatively(listId: string, diff: number): Promise<void>
+
+  init(): Promise<void>
+  mapMutations(): object
+  createVuexPlugin(): object
+  idle(): Promise<void>
+}
+
+declare const listManager: ListManager
+
+export default listManager
+````
+
 ## File: src/common/tab.js
 ````javascript
 import _ from 'lodash'
@@ -213,6 +198,23 @@ export const normalizeTab = tab => {
   normalizedTab.muted = normalizedTab.muted || tab.mutedInfo && tab.mutedInfo.muted
   return normalizedTab
 }
+````
+
+## File: src/content.js
+````javascript
+import {SYNC_SERVICE_URL} from './common/constants'
+import {sendMessage} from './common/utils'
+
+console.debug('content_script loaded')
+const main = async () => {
+  if (!document.URL.startsWith(SYNC_SERVICE_URL)) return
+  const token = localStorage._BOSS_TOKEN
+  console.debug('token', token)
+  if (!token) return
+  await sendMessage({login: {token}})
+}
+
+main()
 ````
 
 ## File: .github/ISSUE_TEMPLATE.md
@@ -510,6 +512,37 @@ if grep -qi "a11y" "$build_log"; then
 fi
 
 echo "[ok] Build validation passed"
+````
+
+## File: server.js
+````javascript
+const http = require('http');
+
+const server = http.createServer((req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  // The extension specifically looks for these properties
+  const mockResponse = {
+    status: 'success',
+    updated_at: new Date().toISOString(),
+    lists: [] 
+  };
+
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(mockResponse));
+});
+
+server.listen(8000, () => {
+  console.log('Sync server active on port 8000');
+});
 ````
 
 ## File: server/Dockerfile
@@ -1374,6 +1407,672 @@ img {
 }
 ````
 
+## File: src/app/store/bridge.js
+````javascript
+import listManager from '@/common/listManager'
+import browser from 'webextension-polyfill'
+
+// Initialize the listManager for the frontend context
+listManager.init()
+
+/**
+ * Bridge function to handle listManager mutations in a Svelte-friendly way.
+ * This can be used by the Svelte stores to listen for changes from the background
+ * or other tabs.
+ */
+export const listenForChanges = (callback) => {
+  // Listen for 'refresh' messages from listManager (via sendMessage)
+  const listener = (message) => {
+    if (message.refresh || message.listModifed) {
+      callback(message)
+    }
+  }
+  browser.runtime.onMessage.addListener(listener)
+  return () => browser.runtime.onMessage.removeListener(listener)
+}
+
+export default listManager
+````
+
+## File: src/background/index.js
+````javascript
+import 'regenerator-runtime/runtime'
+import init from './init'
+
+init()
+````
+
+## File: src/common/helper.js
+````javascript
+export const clearStorage = () => chrome.storage.local.get()
+  .then(Object.keys).then(chrome.storage.local.remove)
+````
+
+## File: src/common/logger.svelte.js
+````javascript
+let logs = $state([]);
+
+export const logger = {
+  get entries() { return logs; },
+
+  add(type, message, data = null) {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      type,
+      message,
+      data: data ? JSON.parse(JSON.stringify(data)) : null // snapshot
+    };
+    logs.push(entry);
+    if (logs.length > 100) logs.shift(); // keep it light
+
+    // Also log to console for dev
+    console[type === 'error' ? 'error' : 'log'](`[IceTab] ${message}`, data || '');
+  },
+
+  clear() {
+    logs = [];
+  },
+
+  // Bridge methods for compatibility with old logger
+  log(message, ...args) {
+    this.add('log', message, args.length > 0 ? args : null);
+  },
+  error(message, ...args) {
+    this.add('error', message, args.length > 0 ? args : null);
+  },
+  warn(message, ...args) {
+    // Map warn to log or error, or add specific type
+    this.add('warn', message, args.length > 0 ? args : null);
+  },
+  info(message, ...args) {
+    this.add('info', message, args.length > 0 ? args : null);
+  },
+  debug(message, ...args) {
+    // debug might be verbose, maybe optional?
+    this.add('debug', message, args.length > 0 ? args : null);
+  },
+  init() {
+    // No-op for compatibility
+  }
+};
+
+export default logger;
+````
+
+## File: src/common/runtimeContext.js
+````javascript
+const POPUP_CONTEXT = 'popup';
+
+export const getRuntimeSource = () => {
+  if (typeof window === 'undefined' || typeof window.location === 'undefined') {
+    return 'app';
+  }
+  const params = new URLSearchParams(window.location.search || '');
+  return params.get('context') === POPUP_CONTEXT ? POPUP_CONTEXT : 'app';
+};
+
+export const isPopupContext = () => getRuntimeSource() === POPUP_CONTEXT;
+````
+
+## File: src/common/sync-logger.js
+````javascript
+const MAX_LOG_ENTRIES = 100
+
+const logs = []
+
+export const logSyncEvent = (event, details = {}) => {
+  const entry = {
+    timestamp: Date.now(),
+    event,
+    ...details,
+  }
+
+  logs.push(entry)
+  if (logs.length > MAX_LOG_ENTRIES) {
+    logs.shift()
+  }
+
+  console.log(`[SyncLog] ${event}`, details)
+}
+
+export const getSyncLogs = () => [...logs]
+
+export const clearSyncLogs = () => {
+  logs.length = 0
+}
+
+export const exportSyncLogs = () => {
+  return JSON.stringify(logs, null, 2)
+}
+````
+
+## File: src/common/tracker.js
+````javascript
+let imported = false
+export const tracker = () => {
+  if (imported) return
+  /*eslint-disable */
+  // Commenting out the Google Analytics script loading to prevent CSP violations.
+  // (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  // (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  // m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  // })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+  imported = true
+  // ga('create', 'UA-65598064-4', 'auto'); // Also comment out ga calls if not needed.
+  // ga('set', 'checkProtocolTask', function(){});
+}
+````
+
+## File: src/exchanger.js
+````javascript
+const parseLists = (compatible, data) => {
+  const lists = compatible ? data.split('\n\n')
+    .filter(i => i.trim())
+    .map(i => i.split('\n')
+      .filter(j => j)
+      .map(j => {
+        const [url, ...title] = j.split('|')
+        return {
+          url: url.trim(),
+          title: title.join().trim(),
+        }
+      }))
+    .map(tabs => ({tabs}))
+    : JSON.parse(data)
+
+  return lists
+}
+
+addEventListener('message', msg => {
+  const {compatible, data} = msg.data
+  if (compatible == null || !data) throw new Error('wrong message')
+  const listsData = parseLists(compatible, data)
+  if (!Array.isArray(listsData)) throw new Error('data must be an array')
+  postMessage(listsData)
+})
+````
+
+## File: src/mock/index.js
+````javascript
+// Basic Mock for Chrome Extension API
+const storage = {};
+
+const mockBrowser = {
+  runtime: {
+    getURL: (path) => window.location.origin + '/' + (path || ''),
+    id: 'mock-extension-id',
+    onMessage: { addListener: () => { } },
+    sendMessage: () => Promise.resolve(),
+    getManifest: () => ({ version: '0.0.0' }),
+  },
+  tabs: {
+    query: async () => {
+      // Return some dummy tabs
+      return [
+        { id: 1, title: 'Google', url: 'https://google.com', favIconUrl: 'https://www.google.com/favicon.ico', pinned: false, highlighted: true, windowId: 1 },
+        { id: 2, title: 'GitHub', url: 'https://github.com', favIconUrl: 'https://github.com/favicon.ico', pinned: false, highlighted: false, windowId: 1 },
+        { id: 3, title: 'Svelte', url: 'https://svelte.dev', favIconUrl: 'https://svelte.dev/favicon.png', pinned: true, highlighted: false, windowId: 1 },
+        { id: 4, title: 'Twitter', url: 'https://twitter.com', favIconUrl: '', pinned: false, highlighted: false, windowId: 1 },
+      ];
+    },
+    create: async (props) => {
+      console.log('Mock: Creating tab', props);
+      return { id: Math.floor(Math.random() * 1000), ...props };
+    },
+    update: async (id, props) => {
+      console.log('Mock: Updating tab', id, props);
+      return { id, ...props };
+    },
+    remove: async (ids) => {
+      console.log('Mock: Removing tabs', ids);
+    },
+    onActivated: { addListener: () => { } },
+    onUpdated: { addListener: () => { } },
+    onRemoved: { addListener: () => { } },
+    onMoved: { addListener: () => { } },
+  },
+  windows: {
+    getCurrent: async () => ({ id: 1 }),
+    getAll: async () => ([{ id: 1 }]),
+    create: async () => ({ id: 2, tabs: [] }),
+  },
+  storage: {
+    local: {
+      get: async (keys) => {
+        if (!keys) return storage;
+        if (typeof keys === 'string') keys = [keys];
+        const result = {};
+        if (Array.isArray(keys)) {
+          keys.forEach(k => result[k] = storage[k]);
+        } else {
+          // object with default values
+          Object.keys(keys).forEach(k => result[k] = storage[k] || keys[k]);
+        }
+        return JSON.parse(JSON.stringify(result)); // Deep clone
+      },
+      set: async (items) => {
+        Object.assign(storage, items);
+        // Persist to localStorage for DX
+        localStorage.setItem('mock_storage', JSON.stringify(storage));
+        // Trigger onChanged
+        if (mockBrowser.storage.onChanged.listeners) {
+          const changes = {};
+          Object.keys(items).forEach(k => {
+            changes[k] = { newValue: items[k] };
+          });
+          mockBrowser.storage.onChanged.listeners.forEach(l => l(changes, 'local'));
+        }
+      },
+      remove: async (keys) => {
+        if (typeof keys === 'string') keys = [keys];
+        keys.forEach(k => delete storage[k]);
+        localStorage.setItem('mock_storage', JSON.stringify(storage));
+      },
+      clear: async () => {
+        Object.keys(storage).forEach(key => delete storage[key]);
+        localStorage.removeItem('mock_storage');
+      }
+    },
+    onChanged: {
+      listeners: [],
+      addListener: (cb) => mockBrowser.storage.onChanged.listeners.push(cb),
+      removeListener: (cb) => {
+        mockBrowser.storage.onChanged.listeners = mockBrowser.storage.onChanged.listeners.filter(l => l !== cb);
+      }
+    }
+  },
+  i18n: {
+    getMessage: (key) => {
+      const messages = {
+        ui_my_tab_lists: 'My Tab Lists',
+        ui_clean_all: 'Clean All',
+        ui_tabs: 'Tabs',
+        ui_created: 'Created',
+        ui_untitled_list: 'Untitled List',
+        ui_unpin: 'Unpin',
+        ui_pin: 'Pin',
+        ui_restore_all: 'Restore All',
+        ui_nightmode: 'Night Mode',
+        ext_name: 'IceTab Dev',
+        ext_desc: 'Development Mode'
+      };
+      return messages[key] || key;
+    },
+    getUILanguage: () => 'en'
+  },
+  commands: {
+    getAll: async () => []
+  }
+};
+
+// Initialize storage from localStorage
+try {
+  const saved = localStorage.getItem('mock_storage');
+  if (saved) Object.assign(storage, JSON.parse(saved));
+} catch (e) {
+  console.warn('Failed to load mock storage', e);
+}
+
+// Expose globally
+window.browser = mockBrowser;
+window.chrome = mockBrowser;
+
+export default mockBrowser;
+````
+
+## File: vue.config.js
+````javascript
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+
+module.exports = {
+  configureWebpack: {
+    plugins: [
+      new CopyWebpackPlugin({
+        patterns: [
+          {
+            from: 'src/_locales',
+            to: '_locales'
+          }
+        ]
+      })
+    ]
+  },
+  // This line is important for Chrome Extensions
+  filenameHashing: false
+};
+````
+
+## File: webpack.serve.js
+````javascript
+/* eslint-disable */
+const { merge } = require('webpack-merge')
+const common = require('./webpack.common.js')
+const path = require('path')
+const webpack = require('webpack')
+
+module.exports = merge(common, {
+  mode: 'development',
+  devtool: 'inline-source-map',
+  entry: {
+    // Only build the app entry point, inject mock before it
+    app: ['./src/mock/index.js', './src/app/index.js']
+  },
+  devServer: {
+    hot: true,
+    static: {
+      directory: path.join(__dirname, 'dist'),
+    },
+    compress: true,
+    port: 3000,
+    historyApiFallback: {
+      index: 'index.html'
+    },
+    devMiddleware: {
+      writeToDisk: false,
+    }
+  },
+  resolve: {
+    alias: {
+      // Redirect webextension-polyfill to our mock
+      'webextension-polyfill': path.resolve(__dirname, 'src/mock/index.js')
+    }
+  },
+  plugins: [
+    new webpack.NormalModuleReplacementPlugin(
+      /webextension-polyfill/,
+      path.resolve(__dirname, 'src/mock/index.js')
+    ),
+  ]
+})
+````
+
+## File: .gitignore
+````
+# Combined ignores
+# (will remove duplicates later)
+node_modules/**/*
+yarn-error.log
+dist
+dist.zip
+.sonar*
+.scanner*
+stats.json
+.DS_Store
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Directory for instrumented libs generated by jscoverage/JSCover
+lib-cov
+
+# Coverage directory used by tools like istanbul
+coverage
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
+.grunt
+
+# Bower dependency directory (https://bower.io/)
+bower_components
+
+# node-waf configuration
+.lock-wscript
+
+# Compiled binary addons (https://nodejs.org/api/addons.html)
+build/Release
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Snowpack dependency directory (https://snowpack.dev/)
+web_modules/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+out
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+# Comment in the public line in if your project uses Gatsby and not Next.js
+# https://nextjs.org/blog/next-9-1#public-directory-support
+# public
+
+# vuepress build output
+.vuepress/dist
+
+# vuepress v2.x temp and cache directory
+.temp
+.cache
+
+# vitepress build output
+**/.vitepress/dist
+
+# vitepress cache directory
+**/.vitepress/cache
+
+# Docusaurus cache and generated files
+.docusaurus
+
+# Serverless directories
+.serverless/
+
+# FuseBox cache
+.fusebox/
+
+# DynamoDB Local files
+.dynamodb/
+
+# TernJS port file
+.tern-port
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# yarn v2
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*
+````
+
+## File: config.js
+````javascript
+/* eslint-disable */
+module.exports = {
+  development: {
+    __CLIENT_ID__: '530831729511-eq8apt6dhjimbmdli90jp2ple0lfmn3l.apps.googleusercontent.com',
+    __DEV_CSP__: process.env.MOZ ? '' : ' http://localhost:8098 chrome-extension://nhdogjmejiglipccpnnnanhbledajbpd',
+    __EXT_NAME__: 'IceTab (dev)',
+    __CONTENT_SCRIPTS_MATCHES__: process.env.MOZ ? '*://*/*' : 'http://127.0.0.1:8000/*',
+  },
+  production: {
+    __CLIENT_ID__: '530831729511-dclgvblhv7var13mvpjochb5f295a6vc.apps.googleusercontent.com',
+    __DEV_CSP__: '',
+    __EXT_NAME__: '__MSG_ext_name__',
+    __CONTENT_SCRIPTS_MATCHES__: 'https://boss.cnwangjie.com/*',
+  }
+}
+````
+
+## File: LICENSE
+````
+MIT License
+
+Better OneTab ~ Copyright (c) 2018-2019 Wang Jie
+Better OneTab: RELOADED ~ Copyright (c) 2025 Elijah
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+````
+
+## File: server/database.py
+````python
+import datetime
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Boolean, text
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
+
+SQLALCHEMY_DATABASE_URL = "sqlite:///./icetab.db"
+
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    api_key = Column(String, unique=True, index=True)
+    last_synced_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    tab_lists = relationship("TabList", back_populates="user")
+
+class TabList(Base):
+    __tablename__ = "tab_lists"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    remote_id = Column(String, index=True) # Extension's ID
+    title = Column(String)
+    tabs = Column(String)  # JSON string
+    category = Column(String)
+    tags = Column(String)  # JSON string
+    time = Column(Integer)
+    pinned = Column(Boolean, default=False)
+    color = Column(String)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    user = relationship("User", back_populates="tab_lists")
+
+def init_db():
+    Base.metadata.create_all(bind=engine)
+    ensure_columns()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def ensure_columns():
+    """Best-effort migration to add new sync-related columns without losing existing data."""
+    with engine.connect() as conn:
+        table_info = conn.execute(text("PRAGMA table_info('tab_lists')")).fetchall()
+        existing = {row[1] for row in table_info}
+        if "time" not in existing:
+            conn.execute(text("ALTER TABLE tab_lists ADD COLUMN time INTEGER"))
+        if "pinned" not in existing:
+            conn.execute(text("ALTER TABLE tab_lists ADD COLUMN pinned INTEGER DEFAULT 0"))
+        if "color" not in existing:
+            conn.execute(text("ALTER TABLE tab_lists ADD COLUMN color VARCHAR"))
+
+        user_info = conn.execute(text("PRAGMA table_info('users')")).fetchall()
+        user_cols = {row[1] for row in user_info}
+        if "last_synced_at" not in user_cols:
+            conn.execute(text("ALTER TABLE users ADD COLUMN last_synced_at TEXT"))
+````
+
+## File: server/docker-compose.yml
+````yaml
+version: '3.8'
+
+services:
+  server:
+    build: .
+    ports:
+      - "6745:8000"
+    volumes:
+      - .:/app
+      - db_data:/app/data
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: always
+
+volumes:
+  db_data:
+````
+
 ## File: src/app/page/settings/SettingsView.svelte
 ````svelte
 <script>
@@ -1387,7 +2086,7 @@ img {
   let settings = $state({
     syncBaseUrl: "",
     syncApiKey: "",
-    autoSyncEnabled: true,
+    autoSyncEnabled: false,
     autoSyncInterval: 300, // seconds
     confirmBeforeRestore: true,
     defaultRestoreBehavior: "current-window", // "current-window" | "new-window"
@@ -1408,7 +2107,7 @@ img {
     if (opts.opts) {
       settings.syncBaseUrl = opts.opts.syncBaseUrl || "http://localhost:8000";
       settings.syncApiKey = opts.opts.syncApiKey || "";
-      settings.autoSyncEnabled = opts.opts.autoSyncEnabled ?? true;
+      settings.autoSyncEnabled = opts.opts.autoSyncEnabled ?? false;
       settings.autoSyncInterval = opts.opts.autoSyncInterval || 300;
       settings.confirmBeforeRestore = opts.opts.confirmBeforeRestore ?? true;
       settings.defaultRestoreBehavior = opts.opts.defaultRestoreBehavior || "current-window";
@@ -1489,7 +2188,7 @@ img {
     
     settings.syncBaseUrl = "http://localhost:8000";
     settings.syncApiKey = "";
-    settings.autoSyncEnabled = true;
+    settings.autoSyncEnabled = false;
     settings.autoSyncInterval = 300;
     settings.confirmBeforeRestore = true;
     settings.defaultRestoreBehavior = "current-window";
@@ -1979,47 +2678,6 @@ img {
 </style>
 ````
 
-## File: src/app/store/bridge.js
-````javascript
-import listManager from '@/common/listManager'
-import browser from 'webextension-polyfill'
-
-// Initialize the listManager for the frontend context
-listManager.init()
-
-/**
- * Bridge function to handle listManager mutations in a Svelte-friendly way.
- * This can be used by the Svelte stores to listen for changes from the background
- * or other tabs.
- */
-export const listenForChanges = (callback) => {
-  // Listen for 'refresh' messages from listManager (via sendMessage)
-  const listener = (message) => {
-    if (message.refresh || message.listModifed) {
-      callback(message)
-    }
-  }
-  browser.runtime.onMessage.addListener(listener)
-  return () => browser.runtime.onMessage.removeListener(listener)
-}
-
-export default listManager
-````
-
-## File: src/background/index.js
-````javascript
-import 'regenerator-runtime/runtime'
-import init from './init'
-
-init()
-````
-
-## File: src/common/helper.js
-````javascript
-export const clearStorage = () => chrome.storage.local.get()
-  .then(Object.keys).then(chrome.storage.local.remove)
-````
-
 ## File: src/common/intents.js
 ````javascript
 import { RUNTIME_MESSAGES } from './constants';
@@ -2030,674 +2688,6 @@ export const sendStashCurrentTabIntent = (source = 'app') => {
     payload: { source },
   });
 };
-````
-
-## File: src/common/listManager.d.ts
-````typescript
-declare class ListManager {
-  addList(list: object): Promise<void>
-  updateListById(listId: string, list: object, time?: number): Promise<void>
-  removeListById(listId: string): Promise<void>
-  changeListOrderRelatively(listId: string, diff: number): Promise<void>
-
-  init(): Promise<void>
-  mapMutations(): object
-  createVuexPlugin(): object
-  idle(): Promise<void>
-}
-
-declare const listManager: ListManager
-
-export default listManager
-````
-
-## File: src/common/logger.svelte.js
-````javascript
-let logs = $state([]);
-
-export const logger = {
-  get entries() { return logs; },
-
-  add(type, message, data = null) {
-    const entry = {
-      timestamp: new Date().toISOString(),
-      type,
-      message,
-      data: data ? JSON.parse(JSON.stringify(data)) : null // snapshot
-    };
-    logs.push(entry);
-    if (logs.length > 100) logs.shift(); // keep it light
-
-    // Also log to console for dev
-    console[type === 'error' ? 'error' : 'log'](`[IceTab] ${message}`, data || '');
-  },
-
-  clear() {
-    logs = [];
-  },
-
-  // Bridge methods for compatibility with old logger
-  log(message, ...args) {
-    this.add('log', message, args.length > 0 ? args : null);
-  },
-  error(message, ...args) {
-    this.add('error', message, args.length > 0 ? args : null);
-  },
-  warn(message, ...args) {
-    // Map warn to log or error, or add specific type
-    this.add('warn', message, args.length > 0 ? args : null);
-  },
-  info(message, ...args) {
-    this.add('info', message, args.length > 0 ? args : null);
-  },
-  debug(message, ...args) {
-    // debug might be verbose, maybe optional?
-    this.add('debug', message, args.length > 0 ? args : null);
-  },
-  init() {
-    // No-op for compatibility
-  }
-};
-
-export default logger;
-````
-
-## File: src/common/runtimeContext.js
-````javascript
-const POPUP_CONTEXT = 'popup';
-
-export const getRuntimeSource = () => {
-  if (typeof window === 'undefined' || typeof window.location === 'undefined') {
-    return 'app';
-  }
-  const params = new URLSearchParams(window.location.search || '');
-  return params.get('context') === POPUP_CONTEXT ? POPUP_CONTEXT : 'app';
-};
-
-export const isPopupContext = () => getRuntimeSource() === POPUP_CONTEXT;
-````
-
-## File: src/common/sync-logger.js
-````javascript
-const MAX_LOG_ENTRIES = 100
-
-const logs = []
-
-export const logSyncEvent = (event, details = {}) => {
-  const entry = {
-    timestamp: Date.now(),
-    event,
-    ...details,
-  }
-
-  logs.push(entry)
-  if (logs.length > MAX_LOG_ENTRIES) {
-    logs.shift()
-  }
-
-  console.log(`[SyncLog] ${event}`, details)
-}
-
-export const getSyncLogs = () => [...logs]
-
-export const clearSyncLogs = () => {
-  logs.length = 0
-}
-
-export const exportSyncLogs = () => {
-  return JSON.stringify(logs, null, 2)
-}
-````
-
-## File: src/common/tracker.js
-````javascript
-let imported = false
-export const tracker = () => {
-  if (imported) return
-  /*eslint-disable */
-  // Commenting out the Google Analytics script loading to prevent CSP violations.
-  // (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-  // (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-  // m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-  // })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
-  imported = true
-  // ga('create', 'UA-65598064-4', 'auto'); // Also comment out ga calls if not needed.
-  // ga('set', 'checkProtocolTask', function(){});
-}
-````
-
-## File: src/content.js
-````javascript
-import {SYNC_SERVICE_URL} from './common/constants'
-import {sendMessage} from './common/utils'
-
-console.debug('content_script loaded')
-const main = async () => {
-  if (!document.URL.startsWith(SYNC_SERVICE_URL)) return
-  const token = localStorage._BOSS_TOKEN
-  console.debug('token', token)
-  if (!token) return
-  await sendMessage({login: {token}})
-}
-
-main()
-````
-
-## File: src/gdrive_sandbox.html
-````html
-<!DOCTYPE html>
-<html>
-<head>
-  <script src="https://apis.google.com/js/api.js"></script>
-  <script src="./gdrive_sandbox.js"></script>
-</head>
-<body></body>
-</html>
-````
-
-## File: src/mock/index.js
-````javascript
-// Basic Mock for Chrome Extension API
-const storage = {};
-
-const mockBrowser = {
-  runtime: {
-    getURL: (path) => window.location.origin + '/' + (path || ''),
-    id: 'mock-extension-id',
-    onMessage: { addListener: () => { } },
-    sendMessage: () => Promise.resolve(),
-    getManifest: () => ({ version: '0.0.0' }),
-  },
-  tabs: {
-    query: async () => {
-      // Return some dummy tabs
-      return [
-        { id: 1, title: 'Google', url: 'https://google.com', favIconUrl: 'https://www.google.com/favicon.ico', pinned: false, highlighted: true, windowId: 1 },
-        { id: 2, title: 'GitHub', url: 'https://github.com', favIconUrl: 'https://github.com/favicon.ico', pinned: false, highlighted: false, windowId: 1 },
-        { id: 3, title: 'Svelte', url: 'https://svelte.dev', favIconUrl: 'https://svelte.dev/favicon.png', pinned: true, highlighted: false, windowId: 1 },
-        { id: 4, title: 'Twitter', url: 'https://twitter.com', favIconUrl: '', pinned: false, highlighted: false, windowId: 1 },
-      ];
-    },
-    create: async (props) => {
-      console.log('Mock: Creating tab', props);
-      return { id: Math.floor(Math.random() * 1000), ...props };
-    },
-    update: async (id, props) => {
-      console.log('Mock: Updating tab', id, props);
-      return { id, ...props };
-    },
-    remove: async (ids) => {
-      console.log('Mock: Removing tabs', ids);
-    },
-    onActivated: { addListener: () => { } },
-    onUpdated: { addListener: () => { } },
-    onRemoved: { addListener: () => { } },
-    onMoved: { addListener: () => { } },
-  },
-  windows: {
-    getCurrent: async () => ({ id: 1 }),
-    getAll: async () => ([{ id: 1 }]),
-    create: async () => ({ id: 2, tabs: [] }),
-  },
-  storage: {
-    local: {
-      get: async (keys) => {
-        if (!keys) return storage;
-        if (typeof keys === 'string') keys = [keys];
-        const result = {};
-        if (Array.isArray(keys)) {
-          keys.forEach(k => result[k] = storage[k]);
-        } else {
-          // object with default values
-          Object.keys(keys).forEach(k => result[k] = storage[k] || keys[k]);
-        }
-        return JSON.parse(JSON.stringify(result)); // Deep clone
-      },
-      set: async (items) => {
-        Object.assign(storage, items);
-        // Persist to localStorage for DX
-        localStorage.setItem('mock_storage', JSON.stringify(storage));
-        // Trigger onChanged
-        if (mockBrowser.storage.onChanged.listeners) {
-          const changes = {};
-          Object.keys(items).forEach(k => {
-            changes[k] = { newValue: items[k] };
-          });
-          mockBrowser.storage.onChanged.listeners.forEach(l => l(changes, 'local'));
-        }
-      },
-      remove: async (keys) => {
-        if (typeof keys === 'string') keys = [keys];
-        keys.forEach(k => delete storage[k]);
-        localStorage.setItem('mock_storage', JSON.stringify(storage));
-      },
-      clear: async () => {
-        Object.keys(storage).forEach(key => delete storage[key]);
-        localStorage.removeItem('mock_storage');
-      }
-    },
-    onChanged: {
-      listeners: [],
-      addListener: (cb) => mockBrowser.storage.onChanged.listeners.push(cb),
-      removeListener: (cb) => {
-        mockBrowser.storage.onChanged.listeners = mockBrowser.storage.onChanged.listeners.filter(l => l !== cb);
-      }
-    }
-  },
-  i18n: {
-    getMessage: (key) => {
-      const messages = {
-        ui_my_tab_lists: 'My Tab Lists',
-        ui_clean_all: 'Clean All',
-        ui_tabs: 'Tabs',
-        ui_created: 'Created',
-        ui_untitled_list: 'Untitled List',
-        ui_unpin: 'Unpin',
-        ui_pin: 'Pin',
-        ui_restore_all: 'Restore All',
-        ui_nightmode: 'Night Mode',
-        ext_name: 'IceTab Dev',
-        ext_desc: 'Development Mode'
-      };
-      return messages[key] || key;
-    },
-    getUILanguage: () => 'en'
-  },
-  commands: {
-    getAll: async () => []
-  }
-};
-
-// Initialize storage from localStorage
-try {
-  const saved = localStorage.getItem('mock_storage');
-  if (saved) Object.assign(storage, JSON.parse(saved));
-} catch (e) {
-  console.warn('Failed to load mock storage', e);
-}
-
-// Expose globally
-window.browser = mockBrowser;
-window.chrome = mockBrowser;
-
-export default mockBrowser;
-````
-
-## File: vue.config.js
-````javascript
-const CopyWebpackPlugin = require('copy-webpack-plugin');
-
-module.exports = {
-  configureWebpack: {
-    plugins: [
-      new CopyWebpackPlugin({
-        patterns: [
-          {
-            from: 'src/_locales',
-            to: '_locales'
-          }
-        ]
-      })
-    ]
-  },
-  // This line is important for Chrome Extensions
-  filenameHashing: false
-};
-````
-
-## File: webpack.serve.js
-````javascript
-/* eslint-disable */
-const { merge } = require('webpack-merge')
-const common = require('./webpack.common.js')
-const path = require('path')
-const webpack = require('webpack')
-
-module.exports = merge(common, {
-  mode: 'development',
-  devtool: 'inline-source-map',
-  entry: {
-    // Only build the app entry point, inject mock before it
-    app: ['./src/mock/index.js', './src/app/index.js']
-  },
-  devServer: {
-    hot: true,
-    static: {
-      directory: path.join(__dirname, 'dist'),
-    },
-    compress: true,
-    port: 3000,
-    historyApiFallback: {
-      index: 'index.html'
-    },
-    devMiddleware: {
-      writeToDisk: false,
-    }
-  },
-  resolve: {
-    alias: {
-      // Redirect webextension-polyfill to our mock
-      'webextension-polyfill': path.resolve(__dirname, 'src/mock/index.js')
-    }
-  },
-  plugins: [
-    new webpack.NormalModuleReplacementPlugin(
-      /webextension-polyfill/,
-      path.resolve(__dirname, 'src/mock/index.js')
-    ),
-  ]
-})
-````
-
-## File: .gitignore
-````
-# Combined ignores
-# (will remove duplicates later)
-node_modules/**/*
-yarn-error.log
-dist
-dist.zip
-.sonar*
-.scanner*
-stats.json
-.DS_Store
-
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
-
-# Diagnostic reports (https://nodejs.org/api/report.html)
-report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Directory for instrumented libs generated by jscoverage/JSCover
-lib-cov
-
-# Coverage directory used by tools like istanbul
-coverage
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
-.grunt
-
-# Bower dependency directory (https://bower.io/)
-bower_components
-
-# node-waf configuration
-.lock-wscript
-
-# Compiled binary addons (https://nodejs.org/api/addons.html)
-build/Release
-
-# Dependency directories
-node_modules/
-jspm_packages/
-
-# Snowpack dependency directory (https://snowpack.dev/)
-web_modules/
-
-# TypeScript cache
-*.tsbuildinfo
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Optional stylelint cache
-.stylelintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variable files
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
-
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# Next.js build output
-.next
-out
-
-# Nuxt.js build / generate output
-.nuxt
-dist
-
-# Gatsby files
-.cache/
-# Comment in the public line in if your project uses Gatsby and not Next.js
-# https://nextjs.org/blog/next-9-1#public-directory-support
-# public
-
-# vuepress build output
-.vuepress/dist
-
-# vuepress v2.x temp and cache directory
-.temp
-.cache
-
-# vitepress build output
-**/.vitepress/dist
-
-# vitepress cache directory
-**/.vitepress/cache
-
-# Docusaurus cache and generated files
-.docusaurus
-
-# Serverless directories
-.serverless/
-
-# FuseBox cache
-.fusebox/
-
-# DynamoDB Local files
-.dynamodb/
-
-# TernJS port file
-.tern-port
-
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
-
-# yarn v2
-.yarn/cache
-.yarn/unplugged
-.yarn/build-state.yml
-.yarn/install-state.gz
-.pnp.*
-````
-
-## File: config.js
-````javascript
-/* eslint-disable */
-module.exports = {
-  development: {
-    __CLIENT_ID__: '530831729511-eq8apt6dhjimbmdli90jp2ple0lfmn3l.apps.googleusercontent.com',
-    __DEV_CSP__: process.env.MOZ ? '' : ' http://localhost:8098 chrome-extension://nhdogjmejiglipccpnnnanhbledajbpd',
-    __EXT_NAME__: 'IceTab (dev)',
-    __CONTENT_SCRIPTS_MATCHES__: process.env.MOZ ? '*://*/*' : 'http://127.0.0.1:8000/*',
-  },
-  production: {
-    __CLIENT_ID__: '530831729511-dclgvblhv7var13mvpjochb5f295a6vc.apps.googleusercontent.com',
-    __DEV_CSP__: '',
-    __EXT_NAME__: '__MSG_ext_name__',
-    __CONTENT_SCRIPTS_MATCHES__: 'https://boss.cnwangjie.com/*',
-  }
-}
-````
-
-## File: LICENSE
-````
-MIT License
-
-Better OneTab ~ Copyright (c) 2018-2019 Wang Jie
-Better OneTab: RELOADED ~ Copyright (c) 2025 Elijah
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-````
-
-## File: server/database.py
-````python
-import datetime
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, ForeignKey, Boolean, text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
-
-SQLALCHEMY_DATABASE_URL = "sqlite:///./icetab.db"
-
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
-
-class User(Base):
-    __tablename__ = "users"
-
-    id = Column(Integer, primary_key=True, index=True)
-    api_key = Column(String, unique=True, index=True)
-    last_synced_at = Column(DateTime, default=datetime.datetime.utcnow)
-    
-    tab_lists = relationship("TabList", back_populates="user")
-
-class TabList(Base):
-    __tablename__ = "tab_lists"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    remote_id = Column(String, index=True) # Extension's ID
-    title = Column(String)
-    tabs = Column(String)  # JSON string
-    category = Column(String)
-    tags = Column(String)  # JSON string
-    time = Column(Integer)
-    pinned = Column(Boolean, default=False)
-    color = Column(String)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-
-    user = relationship("User", back_populates="tab_lists")
-
-def init_db():
-    Base.metadata.create_all(bind=engine)
-    ensure_columns()
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-def ensure_columns():
-    """Best-effort migration to add new sync-related columns without losing existing data."""
-    with engine.connect() as conn:
-        table_info = conn.execute(text("PRAGMA table_info('tab_lists')")).fetchall()
-        existing = {row[1] for row in table_info}
-        if "time" not in existing:
-            conn.execute(text("ALTER TABLE tab_lists ADD COLUMN time INTEGER"))
-        if "pinned" not in existing:
-            conn.execute(text("ALTER TABLE tab_lists ADD COLUMN pinned INTEGER DEFAULT 0"))
-        if "color" not in existing:
-            conn.execute(text("ALTER TABLE tab_lists ADD COLUMN color VARCHAR"))
-
-        user_info = conn.execute(text("PRAGMA table_info('users')")).fetchall()
-        user_cols = {row[1] for row in user_info}
-        if "last_synced_at" not in user_cols:
-            conn.execute(text("ALTER TABLE users ADD COLUMN last_synced_at TEXT"))
-````
-
-## File: server/docker-compose.yml
-````yaml
-version: '3.8'
-
-services:
-  server:
-    build: .
-    ports:
-      - "6745:8000"
-    volumes:
-      - .:/app
-      - db_data:/app/data
-    environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-    restart: always
-
-volumes:
-  db_data:
-````
-
-## File: src/background/commandHandler.js
-````javascript
-import tabs from '../common/tabs'
-
-const commands = {
-  'store-selected-tabs': tabs.storeSelectedTabs,
-  'store-all-tabs': tabs.storeAllTabs,
-  'store-all-in-all-windows': tabs.storeAllTabInAllWindows,
-  'restore-lastest-list': tabs.restoreLastestList,
-  'open-lists': tabs.openTabLists,
-}
-
-const commandHandler = command => {
-  console.log('received command', command)
-  const handler = commands[command]
-  if (!handler) return
-  handler()
-  // Removed Google Analytics call
-  // if (PRODUCTION) ga('send', 'event', 'Command used', command)
-}
-
-export default commandHandler
 ````
 
 ## File: src/common/list.js
@@ -2735,132 +2725,6 @@ export const normalizeList = list => {
 }
 
 export default { createNewTabList, normalizeList, validateList }
-````
-
-## File: src/common/service/custom-sync.js
-````javascript
-import storage from '../storage'
-import { SYNCED_LIST_PROPS } from '../constants'
-import _ from 'lodash'
-
-export class SyncError extends Error {
-  constructor(message, { code = 'unknown', status = null } = {}) {
-    super(message)
-    this.name = 'SyncError'
-    this.code = code
-    this.status = status
-  }
-}
-
-const getSettings = async () => {
-  const opts = await storage.getOptions()
-  return {
-    baseUrl: opts.syncBaseUrl || 'http://localhost:8000',
-    apiKey: opts.syncApiKey || '',
-  }
-}
-
-const fetchData = async (path, method = 'GET', body = null) => {
-  const { baseUrl, apiKey } = await getSettings()
-  const url = `${baseUrl}${path}`
-  const headers = {
-    'x-api-key': apiKey,
-    'Content-Type': 'application/json',
-  }
-  const options = {
-    method,
-    headers,
-  }
-  if (body) {
-    options.body = JSON.stringify(body)
-  }
-
-  let response
-  try {
-    response = await fetch(url, options)
-  } catch (error) {
-    throw new SyncError('Unable to reach sync service', { code: 'offline' })
-  }
-
-  if (response.status === 401 || response.status === 403) {
-    throw new SyncError('Invalid or missing sync credentials', { code: 'auth', status: response.status })
-  }
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => '')
-    throw new SyncError(text || `Sync failed (${response.status})`, { code: 'server', status: response.status })
-  }
-
-  if (response.status === 204) return null
-  return response.json()
-}
-
-const serializeListForSync = list => {
-  const syncedData = _.pick(list, SYNCED_LIST_PROPS)
-  return {
-    remote_id: syncedData._id,
-    title: syncedData.title || '',
-    tabs: syncedData.tabs || [],
-    category: syncedData.category || '',
-    tags: syncedData.tags || [],
-    time: syncedData.time || Date.now(),
-    pinned: Boolean(syncedData.pinned),
-    color: syncedData.color || '',
-    updated_at: syncedData.updatedAt || syncedData.time || Date.now(),
-  }
-}
-
-export const upload = async list => {
-  const payload = serializeListForSync(list)
-  const response = await fetchData('/sync/push', 'POST', payload)
-  if (!response || response.status !== 'success') {
-    throw new SyncError('Server rejected push', { code: 'server' })
-  }
-  return response
-}
-
-export const syncState = async lists => {
-  const payload = {
-    lists: (lists || []).map(serializeListForSync),
-  }
-  const response = await fetchData('/sync/state', 'POST', payload)
-  if (!response || response.status !== 'success') {
-    throw new SyncError('Server rejected sync', { code: 'server' })
-  }
-  return response
-}
-
-export const download = async () => {
-  const data = await fetchData('/sync/pull', 'GET')
-  if (Array.isArray(data)) {
-    return { lists: data, updated_at: null }
-  }
-  return data
-}
-
-export const health = async () => {
-  const { baseUrl } = await getSettings()
-  const response = await fetch(`${baseUrl}/health`)
-  if (!response.ok) {
-    throw new SyncError(`Health check failed (${response.status})`, { code: 'server', status: response.status })
-  }
-  return response.json()
-}
-
-export const AI = {
-  categorize: async tabs => {
-    return fetchData('/ai/categorize', 'POST', { tabs })
-  },
-}
-
-export default {
-  upload,
-  syncState,
-  download,
-  health,
-  AI,
-  SyncError,
-}
 ````
 
 ## File: src/common/storage.js
@@ -2904,144 +2768,6 @@ export default {
   get,
   set,
 }
-````
-
-## File: src/exchanger.js
-````javascript
-const parseLists = (compatible, data) => {
-  const lists = compatible ? data.split('\n\n')
-    .filter(i => i.trim())
-    .map(i => i.split('\n')
-      .filter(j => j)
-      .map(j => {
-        const [url, ...title] = j.split('|')
-        return {
-          url: url.trim(),
-          title: title.join().trim(),
-        }
-      }))
-    .map(tabs => ({tabs}))
-    : JSON.parse(data)
-
-  return lists
-}
-
-addEventListener('message', msg => {
-  const {compatible, data} = msg.data
-  if (compatible == null || !data) throw new Error('wrong message')
-  const listsData = parseLists(compatible, data)
-  if (!Array.isArray(listsData)) throw new Error('data must be an array')
-  postMessage(listsData)
-})
-````
-
-## File: src/gdrive_sandbox.js
-````javascript
-// src/gdrive_sandbox.js
-/* global gapi */ // Add this line to declare gapi as a global
-console.log('Sandbox script started.')
-
-// Move function definitions to the top
-async function prepareGapi(token) {
-  console.log('Sandbox: Waiting for gapi.client to load...')
-  await new Promise(resolve => {
-    const interval = setInterval(() => {
-      if (window.gapi && window.gapi.client) {
-        clearInterval(interval)
-        gapi.load('client', resolve)
-      }
-    }, 100)
-  })
-  console.log('Sandbox: gapi.client loaded. Setting auth token.')
-  gapi.auth.setToken({ access_token: token })
-  console.log('Sandbox: Loading Drive API v3...')
-  await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest')
-  console.log('Sandbox: Drive API loaded.')
-  return gapi
-}
-
-async function forceSaveFile(data, filename, token) {
-  console.log('Sandbox: forceSaveFile started.')
-  const {gapi} = window
-  const folder = await getStorageFolder(gapi)
-  console.log('Sandbox: Storage folder found/created with ID:', folder.id)
-
-  const value = JSON.stringify(data, null, 4)
-  const type = 'application/json'
-  const content = new Blob([value], { type })
-
-  const metadata = {
-    name: filename,
-    mimeType: type,
-    parents: [folder.id],
-  }
-
-  const form = new FormData()
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
-  form.append('file', content)
-
-  console.log('Sandbox: Uploading file to Google Drive...')
-  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-    method: 'POST',
-    headers: new Headers({ Authorization: `Bearer ${token}` }),
-    body: form,
-  })
-
-  console.log('Sandbox: Google Drive API response status:', res.status)
-  if (!res.ok) {
-    const error = await res.json()
-    console.error('Sandbox: Google Drive API error response:', error)
-    throw new Error(`Google Drive API Error: ${error.error.message}`)
-  }
-
-  return res.json()
-}
-
-async function getStorageFolder(gapi) {
-  console.log("Sandbox: Searching for 'icetab-storage' folder...")
-  const res = await gapi.client.drive.files.list({
-    q: `mimeType = 'application/vnd.google-apps.folder' and name = 'icetab-storage' and trashed = false`,
-    fields: 'files(id, name)',
-  })
-
-  if (res.result.files && res.result.files.length > 0) {
-    console.log('Sandbox: Found existing folder.')
-    return res.result.files[0]
-  } else {
-    console.log("Sandbox: Folder not found. Creating new 'icetab-storage' folder...")
-    const fileMetadata = {
-      name: 'icetab-storage',
-      mimeType: 'application/vnd.google-apps.folder'
-    }
-    const folderRes = await gapi.client.drive.files.create({ resource: fileMetadata, fields: 'id' })
-    console.log('Sandbox: New folder created.')
-    return folderRes.result
-  }
-}
-
-
-window.addEventListener('message', async event => {
-  try {
-    console.log('Sandbox received message:', event.data.command)
-    if (event.source !== window.parent) {
-      return
-    }
-
-    const { command, data, token } = event.data
-
-    if (command === 'saveToGDrive') {
-      console.log('Sandbox: "saveToGDrive" command received. Preparing GAPI...')
-      await prepareGapi(token)
-      console.log('Sandbox: GAPI prepared. Saving file...')
-      const result = await forceSaveFile(data, 'list_save_' + new Date().toISOString() + '.json', token)
-      console.log('Sandbox: File save successful. Posting success message back.')
-      window.parent.postMessage({ success: true, result }, '*')
-    }
-  } catch (error) {
-    console.error('Sandbox: A critical error occurred:', error)
-    window.parent.postMessage({ success: false, error: error.message || 'An unknown error occurred inside the sandbox.' }, '*')
-  }
-})
 ````
 
 ## File: webpack.dev.js
@@ -3269,232 +2995,6 @@ globals:
   $inspect: readonly
 ````
 
-## File: server/main.py
-````python
-import os
-import datetime
-from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, Security, Request
-from fastapi.security.api_key import APIKeyHeader
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
-import json
-from openai import OpenAI
-from dotenv import load_dotenv
-import logging
-
-from database import init_db, get_db, User, TabList
-
-load_dotenv()
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-app = FastAPI(title="SquirrlTab Sync API", version="2.0.0")
-
-# CORS Middleware
-from fastapi.middleware.cors import CORSMiddleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Security
-API_KEY_NAME = "x-api-key"
-api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
-
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
-
-# Pydantic Models
-class TabItem(BaseModel):
-    title: str
-    url: str
-    favIconUrl: Optional[str] = ""
-    pinned: Optional[bool] = False
-
-class TabListSchema(BaseModel):
-    remote_id: str
-    title: str
-    tabs: List[TabItem]
-    category: Optional[str] = None
-    tags: Optional[List[str]] = []
-    time: Optional[int] = None
-    pinned: Optional[bool] = False
-    color: Optional[str] = ""
-    updated_at: Optional[int] = None
-
-class FullSyncPayload(BaseModel):
-    lists: List[TabListSchema] = []
-
-# Helpers
-def epoch_ms_to_dt(value: Optional[int]) -> datetime.datetime:
-    if value is None:
-        return datetime.datetime.utcnow()
-    return datetime.datetime.utcfromtimestamp(value / 1000)
-
-def dt_to_epoch_ms(value: Optional[datetime.datetime]) -> Optional[int]:
-    if value is None:
-        return None
-    return int(value.timestamp() * 1000)
-
-# FIXED: Auth Dependency using api_key instead of username
-def get_user_by_api_key(api_key: str = Security(api_key_header), db: Session = Depends(get_db)):
-    if not api_key:
-        logger.warning("No API key provided, checking for default development user")
-        user = db.query(User).filter(User.api_key == "dev-key-12345").first()
-        if not user:
-            user = User(api_key="dev-key-12345")
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-            logger.info("Created default development user")
-        return user
-    
-    user = db.query(User).filter(User.api_key == api_key).first()
-    if not user:
-        raise HTTPException(status_code=403, detail="Could not validate credentials")
-    return user
-
-@app.on_event("startup")
-def startup_event():
-    init_db()
-    logger.info("Database initialized")
-
-@app.get("/")
-def root():
-    return {"status": "running", "version": "2.0.0"}
-
-@app.get("/health")
-def health_check():
-    return {
-        "status": "ok",
-        "time": datetime.datetime.utcnow().isoformat(),
-        "ai_enabled": OPENAI_API_KEY is not None
-    }
-
-# FIXED: Pull Endpoint (Removed user.username)
-@app.get("/sync/pull")
-def pull_tabs(user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
-    try:
-        logger.info(f"Pull request from user ID: {user.id}")
-        lists = db.query(TabList).filter(TabList.user_id == user.id).all()
-        
-        result = []
-        for l in lists:
-            result.append({
-                "remote_id": l.remote_id,
-                "title": l.title,
-                "tabs": json.loads(l.tabs),
-                "category": l.category,
-                "tags": json.loads(l.tags) if l.tags else [],
-                "time": l.time,
-                "pinned": bool(l.pinned),
-                "color": l.color,
-                "updated_at": dt_to_epoch_ms(l.updated_at)
-            })
-        
-        # Calculate last sync time
-        dataset_updated = user.last_synced_at or (max((l.updated_at for l in lists if l.updated_at), default=None))
-        
-        return {
-            "status": "success",
-            "lists": result,
-            "updated_at": dataset_updated.isoformat() if dataset_updated else None
-        }
-    except Exception as e:
-        logger.error(f"Error pulling tabs: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
-
-
-@app.post("/sync/push")
-def push_tabs(data: TabListSchema, user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
-    try:
-        logger.info(f"Incremental push from user {user.id} for list {data.remote_id}")
-        updated_dt = epoch_ms_to_dt(data.updated_at or data.time)
-
-        # Check if this specific list already exists
-        existing = db.query(TabList).filter(
-            TabList.user_id == user.id,
-            TabList.remote_id == data.remote_id
-        ).first()
-
-        if existing:
-            existing.title = data.title
-            existing.tabs = json.dumps([t.dict() for t in data.tabs])
-            existing.category = data.category
-            existing.tags = json.dumps(data.tags) if data.tags else json.dumps([])
-            existing.time = data.time
-            existing.pinned = bool(data.pinned)
-            existing.color = data.color
-            existing.updated_at = updated_dt
-        else:
-            new_list = TabList(
-                user_id=user.id,
-                remote_id=data.remote_id,
-                title=data.title,
-                tabs=json.dumps([t.dict() for t in data.tabs]),
-                category=data.category,
-                tags=json.dumps(data.tags) if data.tags else json.dumps([]),
-                time=data.time,
-                pinned=bool(data.pinned),
-                color=data.color,
-                updated_at=updated_dt
-            )
-            db.add(new_list)
-
-        user.last_synced_at = datetime.datetime.utcnow()
-        db.commit()
-        return {"status": "success", "remote_id": data.remote_id}
-    except Exception as e:
-        logger.error(f"Error in incremental push: {str(e)}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Push failed")
-
-# FIXED: State/Replace Endpoint (Removed user.username)
-@app.post("/sync/state")
-def replace_state(payload: FullSyncPayload, user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
-    try:
-        logger.info(f"Full sync for user ID: {user.id} with {len(payload.lists)} lists")
-        
-        # Clear existing
-        db.query(TabList).filter(TabList.user_id == user.id).delete()
-        
-        for entry in payload.lists:
-            updated_dt = epoch_ms_to_dt(entry.updated_at or entry.time)
-            new_row = TabList(
-                user_id=user.id,
-                remote_id=entry.remote_id,
-                title=entry.title,
-                tabs=json.dumps([t.dict() for t in entry.tabs]),
-                category=entry.category,
-                tags=json.dumps(entry.tags or []),
-                time=entry.time,
-                pinned=bool(entry.pinned),
-                color=entry.color,
-                updated_at=updated_dt,
-            )
-            db.add(new_row)
-
-        user.last_synced_at = datetime.datetime.utcnow()
-        db.commit()
-        return {"status": "success", "updated_at": user.last_synced_at.isoformat()}
-    except Exception as e:
-        logger.error(f"Error during full sync: {str(e)}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    logger.info(f"{request.method} {request.url.path}")
-    response = await call_next(request)
-    return response
-````
-
 ## File: src/app/component/main/Snackbar.svelte
 ````svelte
 <script>
@@ -3587,478 +3087,28 @@ async def log_requests(request: Request, call_next):
 </style>
 ````
 
-## File: src/app/store/syncStore.svelte.js
+## File: src/background/commandHandler.js
 ````javascript
-import browser from 'webextension-polyfill'
-import CustomSync, { SyncError } from '@/common/service/custom-sync'
-import storage from '@/common/storage'
-import { createNewTabList } from '@/common/list'
-import { SYNC_PHASES, RUNTIME_MESSAGES } from '@/common/constants'
-import { logSyncEvent } from '@/common/sync-logger'
-import tabsHelper from '@/common/tabs'
-import manager from './bridge'
-import _ from 'lodash'
+import tabs from '../common/tabs'
 
-const RETRY_DELAY = 10000
-
-const getListTimestamp = list => list?.updatedAt || list?.time || 0
-const buildSignature = lists => (lists || []).map(list => `${list._id}:${getListTimestamp(list)}:${list.tabs?.length || 0}`).join('|')
-const computeVersion = lists => (lists || []).reduce((acc, list) => Math.max(acc, getListTimestamp(list)), 0)
-const parseRemoteVersion = value => {
-  if (!value) return 0
-  if (typeof value === 'number') return value
-  const parsed = Date.parse(value)
-  return Number.isNaN(parsed) ? 0 : parsed
+const commands = {
+  'store-selected-tabs': tabs.storeSelectedTabs,
+  'store-all-tabs': tabs.storeAllTabs,
+  'store-all-in-all-windows': tabs.storeAllTabInAllWindows,
+  'restore-lastest-list': tabs.restoreLastestList,
+  'open-lists': tabs.openlists,
 }
 
-const mapRemoteList = remote =>
-  createNewTabList({
-    _id: remote.remote_id,
-    title: remote.title,
-    tabs: remote.tabs || [],
-    tags: remote.tags || [],
-    category: remote.category || '',
-    time: remote.time || Date.now(),
-    pinned: remote.pinned,
-    color: remote.color || '',
-    updatedAt: remote.updated_at || remote.time || Date.now(),
-  })
-
-let pendingPayload = null
-let retryTimer = null
-
-let state = $state({
-  lists: [],
-  opts: {},
-  aiLoading: null,
-  syncing: false,
-  snackbar: { status: false, msg: '' },
-  initialized: false,
-  lastSyncSuccess: null,
-  syncPhase: SYNC_PHASES.NEVER_SYNCED,
-  syncError: null,
-  localOnly: false,
-  lastSyncedAt: null,
-  lastSyncedSignature: '',
-  remoteVersion: 0,
-  pendingRetry: null,
-})
-
-const normalizeSyncError = error => {
-  if (error instanceof SyncError) {
-    const phaseMap = {
-      offline: SYNC_PHASES.OFFLINE,
-      auth: SYNC_PHASES.AUTH_ERROR,
-      server: SYNC_PHASES.SERVER_ERROR,
-    }
-    return {
-      code: error.code || 'unknown',
-      message: error.message,
-      status: error.status,
-      phase: phaseMap[error.code] || SYNC_PHASES.SERVER_ERROR,
-    }
-  }
-  return {
-    code: 'unknown',
-    message: error?.message || 'Unexpected sync failure',
-    status: null,
-    phase: SYNC_PHASES.SERVER_ERROR,
-  }
+const commandHandler = command => {
+  console.log('received command', command)
+  const handler = commands[command]
+  if (!handler) return
+  handler()
+  // Removed Google Analytics call
+  // if (PRODUCTION) ga('send', 'event', 'Command used', command)
 }
 
-const scheduleRetry = () => {
-  if (!state.pendingRetry || retryTimer) return
-  logSyncEvent('retry_scheduled', {
-    delayMs: RETRY_DELAY,
-    reason: state.pendingRetry?.reason || 'unknown',
-  })
-  retryTimer = setTimeout(() => {
-    retryTimer = null
-    if (!state.pendingRetry) return
-    pendingPayload = state.pendingRetry
-    pushStateToServer(state.pendingRetry)
-  }, RETRY_DELAY)
-}
-
-const pushStateToServer = async payload => {
-  if (!payload) return
-  state.syncing = true
-  state.syncPhase = SYNC_PHASES.SYNCING
-  try {
-    const response = await CustomSync.syncState(payload.lists)
-    const remoteVersion = parseRemoteVersion(response?.updated_at) || computeVersion(payload.lists)
-    state.lastSyncedSignature = payload.signature
-    state.remoteVersion = remoteVersion
-    state.lastSyncedAt = Date.now()
-    state.lastSyncSuccess = true
-    state.syncPhase = SYNC_PHASES.SYNCED
-    state.syncError = null
-    state.localOnly = false
-    state.pendingRetry = null
-    pendingPayload = null
-    logSyncEvent('push_success', {
-      listCount: payload.lists?.length || 0,
-      signature: payload.signature,
-      reason: payload.reason,
-      remoteVersion,
-    })
-    if (retryTimer) {
-      clearTimeout(retryTimer)
-      retryTimer = null
-    }
-  } catch (error) {
-    const normalized = normalizeSyncError(error)
-    state.lastSyncSuccess = false
-    state.syncPhase = normalized.phase
-    state.syncError = normalized
-    state.localOnly = true
-    state.pendingRetry = payload
-    scheduleRetry()
-    logSyncEvent('push_failed', {
-      code: normalized.code,
-      phase: normalized.phase,
-      message: normalized.message,
-      listCount: payload?.lists?.length || 0,
-      reason: payload?.reason,
-    })
-    console.error('[SquirrlTab] Sync failed:', error)
-  } finally {
-    state.syncing = false
-  }
-}
-
-const debouncedPush = _.debounce(() => {
-  if (!pendingPayload) return
-  pushStateToServer(pendingPayload)
-}, 1200)
-
-const scheduleSync = (reason = 'change', { immediate = false, listsOverride = null, signatureOverride = null, force = false } = {}) => {
-  if (!state.initialized) return
-  const lists = listsOverride || $state.snapshot(state.lists)
-  const signature = signatureOverride || buildSignature(lists)
-  if (!force && signature === state.lastSyncedSignature) return
-  pendingPayload = { lists, signature, reason }
-  state.localOnly = true
-  if ([SYNC_PHASES.SYNCED, SYNC_PHASES.IDLE, SYNC_PHASES.NEVER_SYNCED].includes(state.syncPhase)) {
-    state.syncPhase = SYNC_PHASES.LOCAL_ONLY
-  }
-  if (immediate) {
-    debouncedPush.cancel()
-    pushStateToServer(pendingPayload)
-  } else {
-    debouncedPush()
-  }
-}
-
-const hydrateFromRemote = async () => {
-  state.syncing = true
-  state.syncPhase = SYNC_PHASES.SYNCING
-  logSyncEvent('hydrate_started')
-  try {
-    const response = await CustomSync.download()
-    const remoteLists = Array.isArray(response?.lists) ? response.lists : []
-    const normalizedRemote = remoteLists.map(mapRemoteList)
-    const remoteVersion = parseRemoteVersion(response?.updated_at) || computeVersion(normalizedRemote)
-    const localSnapshot = $state.snapshot(state.lists)
-    const localVersion = computeVersion(localSnapshot)
-    state.remoteVersion = remoteVersion
-
-    if (remoteVersion > localVersion) {
-      const signature = buildSignature(normalizedRemote)
-      state.lastSyncedSignature = signature
-      state.remoteVersion = remoteVersion
-      state.lastSyncSuccess = true
-      state.localOnly = false
-      state.syncError = null
-      await storage.setLists(normalizedRemote)
-      state.lastSyncedAt = Date.now()
-       state.syncPhase = SYNC_PHASES.SYNCED
-       logSyncEvent('hydrate_success', {
-         action: 'downloaded',
-         remoteLists: normalizedRemote.length,
-         localLists: localSnapshot.length,
-         remoteVersion,
-         localVersion,
-       })
-    } else if (localVersion > remoteVersion && localSnapshot.length) {
-      state.localOnly = true
-      state.syncPhase = SYNC_PHASES.LOCAL_ONLY
-      logSyncEvent('hydrate_success', {
-        action: 'upload_scheduled',
-        remoteLists: normalizedRemote.length,
-        localLists: localSnapshot.length,
-        remoteVersion,
-        localVersion,
-      })
-      scheduleSync('remote-behind', { immediate: true, listsOverride: localSnapshot, signatureOverride: buildSignature(localSnapshot) })
-    } else {
-      state.localOnly = false
-      state.syncPhase = SYNC_PHASES.SYNCED
-      logSyncEvent('hydrate_success', {
-        action: 'unchanged',
-        remoteLists: normalizedRemote.length,
-        localLists: localSnapshot.length,
-        remoteVersion,
-        localVersion,
-      })
-    }
-  } catch (error) {
-    const normalized = normalizeSyncError(error)
-    state.syncPhase = normalized.phase
-    state.syncError = normalized
-    state.lastSyncSuccess = false
-    state.localOnly = true
-    
-    // FORCE LOCAL DATA TO PERSIST
-    // This prevents the UI from clearing or hiding the lists 
-    // just because the server at localhost:8000 is down.
-    if (state.lists.length === 0) {
-       const data = await browser.storage.local.get('lists');
-       state.lists = Array.isArray(data.lists) ? data.lists : [];
-    }
-
-    logSyncEvent('hydrate_failed', {
-      code: normalized.code,
-      phase: normalized.phase,
-      message: normalized.message,
-    })
-    console.error('[SquirrlTab] Failed to hydrate remote state:', error)
-  } finally {
-    state.syncing = false
-    // Ensure initialized is true so the UI knows it's okay to render
-    state.initialized = true 
-  }
-const initStore = async (retries = 3) => {
-  let shouldFinalize = true
-  try {
-    const data = await browser.storage.local.get(['lists', 'opts'])
-    state.lists = Array.isArray(data.lists) ? data.lists : []
-    state.opts = data.opts || {}
-    state.lastSyncedSignature = buildSignature(state.lists)
-    state.remoteVersion = computeVersion(state.lists)
-    state.lastSyncSuccess = null
-    state.localOnly = false
-    state.syncError = null
-    state.syncPhase = SYNC_PHASES.IDLE
-  } catch (error) {
-    console.error('[SquirrlTab] Failed to initialize store:', error)
-    if (retries > 0) {
-      shouldFinalize = false
-      setTimeout(() => initStore(retries - 1), 500)
-      return
-    }
-    state.lists = []
-    state.opts = {}
-    state.lastSyncSuccess = false
-    state.localOnly = true
-    state.syncPhase = SYNC_PHASES.LOCAL_ONLY
-  } finally {
-    if (shouldFinalize) {
-      state.initialized = true
-      hydrateFromRemote()
-    }
-  }
-}
-
-initStore()
-
-browser.storage.onChanged.addListener((changes, area) => {
-  if (area !== 'local') return
-  if (changes.lists) {
-    const newLists = changes.lists.newValue
-    state.lists = Array.isArray(newLists) ? newLists : []
-    console.log('[SquirrlTab] Lists updated from storage:', state.lists.length)
-  }
-  if (changes.opts) {
-    state.opts = changes.opts.newValue || {}
-    console.log('[SquirrlTab] Options updated from storage')
-  }
-})
-
-$effect.root(() => {
-  $effect(() => {
-    if (!state.initialized) return
-    const snapshot = $state.snapshot(state.lists)
-    const signature = buildSignature(snapshot)
-    scheduleSync('change', { listsOverride: snapshot, signatureOverride: signature })
-  })
-})
-  
-
-export const syncStore = {
-  get lists() {
-    return state.lists
-  },
-  get opts() {
-    return state.opts
-  },
-  get aiLoading() {
-    return state.aiLoading
-  },
-  get syncing() {
-    return state.syncing
-  },
-  get snackbar() {
-    return state.snackbar
-  },
-  get initialized() {
-    return state.initialized
-  },
-  get lastSyncSuccess() {
-    return state.lastSyncSuccess
-  },
-  get syncStatus() {
-    return {
-      phase: state.syncPhase,
-      syncing: state.syncing,
-      error: state.syncError,
-      lastSyncedAt: state.lastSyncedAt,
-      localOnly: state.localOnly,
-      pendingRetry: Boolean(state.pendingRetry),
-      lastSyncSuccess: state.lastSyncSuccess,
-    }
-  },
-  updateSnackbar(payload) {
-    if (typeof payload === 'string') {
-      state.snackbar = { status: true, msg: payload }
-    } else {
-      state.snackbar = payload
-    }
-  },
-  get pinnedLists() {
-    return state.lists.filter(list => list.pinned)
-  },
-  get taggedLists() {
-    const tagged = {}
-    state.lists.forEach(list => {
-      (list.tags || []).forEach(tag => {
-        if (!tagged[tag]) tagged[tag] = []
-        tagged[tag].push(list)
-      })
-    })
-    return tagged
-  },
-  async categorizeList(listId) {
-    const list = state.lists.find(l => l._id === listId)
-    if (!list) return
-
-    state.aiLoading = list._id
-    try {
-      const result = await CustomSync.AI.categorize(list.tabs)
-      if (result.category) {
-        manager.updateListById(list._id, { category: result.category })
-      }
-      if (result.tags) {
-        manager.updateListById(list._id, { tags: result.tags })
-      }
-      return result
-    } catch (error) {
-      console.error('[SquirrlTab] Categorization failed:', error)
-      throw error
-    } finally {
-      state.aiLoading = null
-    }
-  },
-  async restoreList(listId, inNewWindow = false) {
-    const list = state.lists.find(l => l._id === listId)
-    if (!list) {
-      console.warn('[SquirrlTab] Cannot restore list: not found', listId)
-      return false
-    }
-    try {
-      if (inNewWindow) await tabsHelper.restoreListInNewWindow(list)
-      else await tabsHelper.restoreTabs(list.tabs)
-      if (!list.pinned) {
-        await manager.removeListById(listId)
-      }
-      return true
-    } catch (error) {
-      console.error('[SquirrlTab] Failed to restore list:', error)
-      throw error
-    }
-  },
-  updateList(listId, updates) {
-    manager.updateListById(listId, updates)
-  },
-  removeList(listId) {
-    manager.removeListById(listId)
-  },
-  pinList(listId, pinned) {
-    manager.updateListById(listId, { pinned })
-  },
-  changeColor(listId, color) {
-    manager.updateListById(listId, { color })
-  },
-  manualRetry() {
-    const hadPending = Boolean(state.pendingRetry)
-    logSyncEvent('manual_retry', { hadPending })
-    if (state.pendingRetry) {
-      if (retryTimer) {
-        clearTimeout(retryTimer)
-        retryTimer = null
-      }
-      const payload = state.pendingRetry
-      state.pendingRetry = null
-      pushStateToServer(payload)
-      return
-    }
-    const snapshot = $state.snapshot(state.lists)
-    scheduleSync('manual-retry', {
-      immediate: true,
-      listsOverride: snapshot,
-      signatureOverride: buildSignature(snapshot),
-      force: true,
-    })
-  },
-  async cleanAll() {
-    const ids = state.lists.map(l => l._id)
-    for (const id of ids) {
-      manager.removeListById(id)
-    }
-  },
-}
-
-browser.runtime.onMessage.addListener(message => {
-  if (!message || !message.type) return
-  if (message.type === RUNTIME_MESSAGES.STASH_COMPLETED) {
-    syncStore.updateSnackbar('Current tab stashed')
-  }
-  if (message.type === RUNTIME_MESSAGES.STASH_FAILED) {
-    const reason = message.payload?.reason
-    const msg = reason === 'BLOCKED_URL'
-      ? 'Cannot stash the IceTab app itself'
-      : 'Unable to stash current tab'
-    syncStore.updateSnackbar(msg)
-  }
-})
-````
-
-## File: src/background/installedEventHandler.js
-````javascript
-import __ from '../common/i18n'
-
-const installedEventHandler = detail => {
-  if (DEBUG) return
-  if (detail.reason === chrome.runtime.OnInstalledReason.UPDATE) {
-    const updatedNotificationId = 'updated'
-    chrome.notifications.onClicked.addListener(id => {
-      if (id === updatedNotificationId) {
-        chrome.tabs.create({ url: 'https://github.com/elijahcommits/icetab/blob/master/CHANGELOG.md' })
-      }
-    })
-    chrome.notifications.create(updatedNotificationId, {
-      type: 'basic',
-      iconUrl: 'assets/icons/icon128.png',
-      title: __('ui_updated_to_ver') + ' v' + chrome.runtime.getManifest().version,
-      message: __('ui_click_view_changelog'),
-    })
-    setTimeout(() => {
-      chrome.notifications.clear(updatedNotificationId)
-    }, 5000)
-  }
-}
-
-export default installedEventHandler
+export default commandHandler
 ````
 
 ## File: src/common/exchange.js
@@ -4155,122 +3205,125 @@ const migrate = async () => {
 export default migrate
 ````
 
-## File: src/common/service/gdrive.js
+## File: src/common/service/custom-sync.js
 ````javascript
-// src/common/service/gdrive.js
+import storage from '../storage'
+import { SYNCED_LIST_PROPS } from '../constants'
 import _ from 'lodash'
 
-const GOOGLE_ACCESS_TOKEN_KEY = 'at'
-const clearToken = () => {
-  localStorage.removeItem(GOOGLE_ACCESS_TOKEN_KEY)
+export class SyncError extends Error {
+  constructor(message, { code = 'unknown', status = null } = {}) {
+    super(message)
+    this.name = 'SyncError'
+    this.code = code
+    this.status = status
+  }
 }
 
-const getAuth = async () => {
-  let token = localStorage.getItem(GOOGLE_ACCESS_TOKEN_KEY)
-  if (token) return token
-
-  console.debug('[gdrive]: getting token')
-  token = await new Promise((resolve, reject) => {
-    chrome.identity.getAuthToken({ interactive: true }, token => {
-      const err = chrome.runtime.lastError
-      if (err) return reject(new Error(err.message))
-      resolve(token)
-    })
-  })
-  localStorage.setItem(GOOGLE_ACCESS_TOKEN_KEY, token)
-  console.debug('[gdrive]: got token')
-  return token
+const getSettings = async () => {
+  const opts = await storage.getOptions()
+  return {
+    baseUrl: opts.syncBaseUrl || 'http://localhost:8000',
+    apiKey: opts.syncApiKey || '',
+  }
 }
 
-const saveToDriveInSandbox = (data, token) => new Promise((resolve, reject) => {
-  // First, remove any old sandbox if it exists from a previous attempt
-  const oldIframe = document.getElementById('gdrive-sandbox-iframe')
-  if (oldIframe) oldIframe.remove()
-
-  console.log('Creating debug sandbox iframe...')
-  const sandboxIframe = document.createElement('iframe')
-  sandboxIframe.id = 'gdrive-sandbox-iframe' // Give it an ID
-  sandboxIframe.src = 'gdrive_sandbox.html'
-
-  // --- Make it visible for debugging ---
-  sandboxIframe.style.position = 'fixed'
-  sandboxIframe.style.bottom = '0'
-  sandboxIframe.style.left = '0'
-  sandboxIframe.style.width = '100%'
-  sandboxIframe.style.height = '150px'
-  sandboxIframe.style.border = '3px solid red'
-  sandboxIframe.style.backgroundColor = '#f0f0f0'
-  sandboxIframe.style.zIndex = '99999'
-
-  document.body.appendChild(sandboxIframe)
-
-  const timeoutId = setTimeout(() => {
-    console.error('Sandbox operation timed out after 25 seconds.')
-    window.removeEventListener('message', messageListener)
-    reject(new Error('Sandbox operation timed out. Check the visible red-bordered sandbox console for errors.'))
-  }, 25000)
-
-  // This is the correct placement for messageListener definition
-  const messageListener = event => {
-    if (event.source !== sandboxIframe.contentWindow) return
-
-    console.log('Message received from sandbox:', event.data)
-    clearTimeout(timeoutId)
-    window.removeEventListener('message', messageListener)
-
-    // --- IMPORTANT: We are NOT removing the iframe so we can inspect it ---
-    // document.body.removeChild(sandboxIframe);
-
-    if (event.data.success) {
-      resolve(event.data.result)
-    } else {
-      reject(new Error(event.data.error || 'Sandboxed operation failed. Check the visible red-bordered sandbox console for errors.'))
-    }
+const fetchData = async (path, method = 'GET', body = null) => {
+  const { baseUrl, apiKey } = await getSettings()
+  const url = `${baseUrl}${path}`
+  const headers = {
+    'x-api-key': apiKey,
+    'Content-Type': 'application/json',
+  }
+  const options = {
+    method,
+    headers,
+  }
+  if (body) {
+    options.body = JSON.stringify(body)
   }
 
-  window.addEventListener('message', messageListener) // messageListener is used here
-
-  sandboxIframe.onload = () => {
-    console.log('Sandbox iframe loaded. Posting message to sandbox...')
-    sandboxIframe.contentWindow.postMessage({
-      command: 'saveToGDrive',
-      data,
-      token
-    }, '*')
-  }
-
-  sandboxIframe.onerror = err => {
-    console.error('Sandbox iframe failed to load.', err)
-    reject(new Error('The sandbox iframe itself failed to load.'))
-  }
-})
-
-const saveCurrentTabLists = async () => {
+  let response
   try {
-    const { lists } = await chrome.storage.local.get('lists')
-    if (_.isEmpty(lists)) {
-      console.log('No lists to save.')
-      return { success: false, message: 'No lists saved.' }
-    }
-    const token = await getAuth()
-    const result = await saveToDriveInSandbox(lists, token)
-    console.log('Successfully saved to Google Drive via sandbox!', result)
-    return { success: true, result }
+    response = await fetch(url, options)
   } catch (error) {
-    console.error('Failed to save to Google Drive:', error)
-    throw new Error(`Google Drive save failed: ${error.message}`)
+    throw new SyncError('Unable to reach sync service', { code: 'offline' })
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    throw new SyncError('Invalid or missing sync credentials', { code: 'auth', status: response.status })
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    throw new SyncError(text || `Sync failed (${response.status})`, { code: 'server', status: response.status })
+  }
+
+  if (response.status === 204) return null
+  return response.json()
+}
+
+const serializeListForSync = list => {
+  const syncedData = _.pick(list, SYNCED_LIST_PROPS)
+  return {
+    remote_id: syncedData._id,
+    title: syncedData.title || '',
+    tabs: syncedData.tabs || [],
+    category: syncedData.category || '',
+    tags: syncedData.tags || [],
+    time: syncedData.time || Date.now(),
+    pinned: Boolean(syncedData.pinned),
+    color: syncedData.color || '',
+    updated_at: syncedData.updatedAt || syncedData.time || Date.now(),
   }
 }
 
-const gdrive = {
-  getAuth,
-  saveCurrentTabLists,
-  clearToken,
+export const upload = async list => {
+  const payload = serializeListForSync(list)
+  const response = await fetchData('/sync/push', 'POST', payload)
+  if (!response || response.status !== 'success') {
+    throw new SyncError('Server rejected push', { code: 'server' })
+  }
+  return response
 }
 
-if (DEBUG) window.gdrive = gdrive
+export const syncState = async lists => {
+  const payload = {
+    lists: (lists || []).map(serializeListForSync),
+  }
+  const response = await fetchData('/sync/state', 'POST', payload)
+  if (!response || response.status !== 'success') {
+    throw new SyncError('Server rejected sync', { code: 'server' })
+  }
+  return response
+}
 
-export default gdrive
+export const download = async () => {
+  const data = await fetchData('/sync/pull', 'GET')
+  if (Array.isArray(data)) {
+    return { lists: data, updated_at: null }
+  }
+  return data
+}
+
+export const health = async () => {
+  return fetchData('/health', 'GET')
+}
+
+export const AI = {
+  categorize: async tabs => {
+    return fetchData('/ai/categorize', 'POST', { tabs })
+  },
+}
+
+export default {
+  upload,
+  syncState,
+  download,
+  health,
+  AI,
+  SyncError,
+}
 ````
 
 ## File: webpack.prod.js
@@ -4299,6 +3352,223 @@ module.exports = merge(common, {
     ],
   },
 })
+````
+
+## File: server/main.py
+````python
+import os
+import datetime
+from typing import List, Optional
+from fastapi import FastAPI, Depends, HTTPException, Security, Request
+from fastapi.security.api_key import APIKeyHeader
+from sqlalchemy.orm import Session
+from pydantic import BaseModel
+import json
+from openai import OpenAI
+from dotenv import load_dotenv
+import logging
+
+from database import init_db, get_db, User, TabList
+
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="SquirrlTab Sync API", version="2.0.0")
+
+# CORS Middleware
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Security
+API_KEY_NAME = "x-api-key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+
+# Pydantic Models
+class TabItem(BaseModel):
+    title: str
+    url: str
+    favIconUrl: Optional[str] = ""
+    pinned: Optional[bool] = None
+
+class listschema(BaseModel):
+    remote_id: str
+    title: str
+    tabs: List[TabItem]
+    category: Optional[str] = None
+    tags: Optional[List[str]] = []
+    time: Optional[int] = None
+    pinned: Optional[bool] = False
+    color: Optional[str] = ""
+    updated_at: Optional[int] = None
+
+class FullSyncPayload(BaseModel):
+    lists: List[listschema] = []
+
+# Helpers
+def epoch_ms_to_dt(value: Optional[int]) -> datetime.datetime:
+    if value is None:
+        return datetime.datetime.utcnow()
+    return datetime.datetime.utcfromtimestamp(value / 1000)
+
+def dt_to_epoch_ms(value: Optional[datetime.datetime]) -> Optional[int]:
+    if value is None:
+        return None
+    return int(value.timestamp() * 1000)
+
+# FIXED: Auth Dependency using api_key instead of username
+def get_user_by_api_key(api_key: str = Security(api_key_header), db: Session = Depends(get_db)):
+    if not api_key:
+        logger.warning("No API key provided, checking for default development user")
+        user = db.query(User).filter(User.api_key == "dev-key-12345").first()
+        if not user:
+            user = User(api_key="dev-key-12345")
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            logger.info("Created default development user")
+        return user
+    
+    user = db.query(User).filter(User.api_key == api_key).first()
+    if not user:
+        raise HTTPException(status_code=403, detail="Could not validate credentials")
+    return user
+
+@app.on_event("startup")
+def startup_event():
+    init_db()
+    logger.info("Database initialized")
+
+@app.get("/")
+def root():
+    return {"status": "running", "version": "2.0.0"}
+
+
+@app.get("/health")
+def health_check():
+    return {
+        "status": "success",
+        "service": "SquirrlTab Sync",
+        "version": "1.0.0"
+    }
+    
+# FIXED: Pull Endpoint (Removed user.username)
+@app.get("/sync/pull")
+def pull_tabs(user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
+    try:
+        logger.info(f"Pull request from user ID: {user.id}")
+        lists = db.query(TabList).filter(TabList.user_id == user.id).all()
+        
+        result = []
+        for l in lists:
+            result.append({
+                "remote_id": l.remote_id,
+                "title": l.title,
+                "tabs": json.loads(l.tabs),
+                "category": l.category,
+                "tags": json.loads(l.tags) if l.tags else [],
+                "time": l.time,
+                "pinned": bool(l.pinned),
+                "color": l.color,
+                "updated_at": dt_to_epoch_ms(l.updated_at)
+            })
+        
+        # Calculate last sync time
+        dataset_updated = user.last_synced_at or (max((l.updated_at for l in lists if l.updated_at), default=None))
+        
+        return {
+            "status": "success",
+            "lists": result,
+            "updated_at": dataset_updated.isoformat() if dataset_updated else None
+        }
+    except Exception as e:
+        logger.error(f"Error pulling tabs: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+@app.post("/sync/push")
+def push_single_list(data: listschema, user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
+    # The extension sends a single list object here
+    existing = db.query(TabList).filter(
+        TabList.remote_id == data.remote_id, 
+        TabList.user_id == user.id
+    ).first()
+    
+    tabs_data = json.dumps([t.dict() for t in data.tabs])
+    
+    if existing:
+        existing.title = data.title
+        existing.tabs = tabs_data
+        existing.category = data.category
+        existing.tags = json.dumps(data.tags)
+        existing.time = data.time
+        existing.pinned = data.pinned
+        existing.color = data.color
+    else:
+        new_list = TabList(
+            user_id=user.id,
+            remote_id=data.remote_id,
+            title=data.title,
+            tabs=tabs_data,
+            category=data.category,
+            tags=json.dumps(data.tags),
+            time=data.time,
+            pinned=data.pinned,
+            color=data.color
+        )
+        db.add(new_list)
+    
+    db.commit()
+    return {"status": "success"}
+
+# FIXED: State/Replace Endpoint (Removed user.username)
+@app.post("/sync/state")
+def replace_state(payload: FullSyncPayload, user: User = Depends(get_user_by_api_key), db: Session = Depends(get_db)):
+    try:
+        logger.info(f"Full sync for user ID: {user.id} with {len(payload.lists)} lists")
+        
+        # Clear existing
+        db.query(TabList).filter(TabList.user_id == user.id).delete()
+        
+        for entry in payload.lists:
+            updated_dt = epoch_ms_to_dt(entry.updated_at or entry.time)
+            new_row = TabList(
+                user_id=user.id,
+                remote_id=entry.remote_id,
+                title=entry.title,
+                tabs=json.dumps([t.dict() for t in entry.tabs]),
+                category=entry.category,
+                tags=json.dumps(entry.tags or []),
+                time=entry.time,
+                pinned=bool(entry.pinned),
+                color=entry.color,
+                updated_at=updated_dt,
+            )
+            db.add(new_row)
+
+        user.last_synced_at = datetime.datetime.utcnow()
+        db.commit()
+        return {"status": "success", "updated_at": user.last_synced_at.isoformat()}
+    except Exception as e:
+        logger.error(f"Error during full sync: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logger.info(f"{request.method} {request.url.path}")
+    response = await call_next(request)
+    return response
 ````
 
 ## File: src/app/App.svelte
@@ -6127,6 +5397,609 @@ module.exports = merge(common, {
 </style>
 ````
 
+## File: src/background/installedEventHandler.js
+````javascript
+import __ from '../common/i18n'
+
+const installedEventHandler = detail => {
+  if (DEBUG) return
+  if (detail.reason === chrome.runtime.OnInstalledReason.UPDATE) {
+    const updatedNotificationId = 'updated'
+    chrome.notifications.onClicked.addListener(id => {
+      if (id === updatedNotificationId) {
+        chrome.tabs.create({ url: 'https://github.com/elijahcommits/icetab/blob/master/CHANGELOG.md' })
+      }
+    })
+    chrome.notifications.create(updatedNotificationId, {
+      type: 'basic',
+      iconUrl: 'assets/icons/icon128.png',
+      title: __('ui_updated_to_ver') + ' v' + chrome.runtime.getManifest().version,
+      message: __('ui_click_view_changelog'),
+    })
+    setTimeout(() => {
+      chrome.notifications.clear(updatedNotificationId)
+    }, 5000)
+  }
+}
+
+export default installedEventHandler
+````
+
+## File: src/common/constants.js
+````javascript
+export const COLORS = [
+  '', 'red', 'pink', 'purple',
+  'indigo', 'blue', 'cyan', 'teal',
+  'green', 'yellow', 'orange', 'brown',
+]
+
+export const ILLEGAL_URLS = ['about:', 'chrome:', 'file:', 'wss:', 'ws:']
+
+export const PICKED_TAB_PROPS = ['url', 'title', 'favIconUrl', 'pinned']
+export const PICKED_LIST_RPOPS = ['_id', 'tabs', 'title', 'tags', 'category', 'time', 'pinned', 'expand', 'color', 'updatedAt']
+export const SYNCED_LIST_PROPS = ['_id', 'tabs', 'title', 'tags', 'category', 'time', 'pinned', 'color', 'updatedAt']
+
+export const TOKEN_KEY = 'token'
+export const AUTH_HEADER = 'auth'
+
+export const END_FRONT = 'front'
+export const END_BACKGROUND = 'background'
+
+export const SYNC_SERVICE_URL = DEBUG ? 'http://127.0.0.1:8000' : 'https://boss.cnwangjie.com'
+export const SYNC_MAX_INTERVAL = 864e5
+export const SYNC_MIN_INTERVAL = 3e5
+
+export const SYNC_PHASES = {
+  IDLE: 'idle',
+  SYNCING: 'syncing',
+  SYNCED: 'synced',
+  AUTH_ERROR: 'auth-error',
+  OFFLINE: 'offline',
+  SERVER_ERROR: 'server-error',
+  NEVER_SYNCED: 'never-synced',
+  LOCAL_ONLY: 'local-only',
+}
+
+export const ADD_LIST = 'addList'
+export const UPDATE_LIST_BY_ID = 'updateListById'
+export const REMOVE_LIST_BY_ID = 'removeListById'
+export const CHANGE_LIST_ORDER = 'changeListOrderRelatively'
+
+export const SENTRY_DSN = 'https://3a924dd322e24dbca1c28364de767ffc@sentry.io/1307154'
+
+export const RUNTIME_MESSAGES = {
+  STASH_CURRENT_TAB: 'STASH_CURRENT_TAB',
+  STASH_COMPLETED: 'STASH_COMPLETED',
+  STASH_FAILED: 'STASH_FAILED',
+}
+````
+
+## File: src/common/listManager.js
+````javascript
+import {
+  SYNCED_LIST_PROPS,
+  END_FRONT,
+  END_BACKGROUND,
+  ADD_LIST,
+  UPDATE_LIST_BY_ID,
+  REMOVE_LIST_BY_ID,
+  CHANGE_LIST_ORDER,
+} from './constants'
+import {isBackground, sendMessage, Mutex} from './utils'
+
+const cache = { lists: null, ops: null }
+const RWLock = new Mutex()
+const getStorage = async () => {
+  const unlockRW = await RWLock.lock()
+  if (cache.lists && cache.ops) return cache
+  const {lists, ops} = await chrome.storage.local.get(['lists', 'ops'])
+  cache.lists = lists || []
+  cache.ops = ops || []
+  await unlockRW()
+  return cache
+}
+const compressOps = ops => {
+  console.debug('[listManager] compress ops: (before)', ops)
+  const removed = []
+  const updated = {}
+  const finalOps = []
+  for (let i = ops.length - 1; i > -1; i -= 1) {
+    const op = ops[i]
+    // ignore all actions for the list if that list will be removed finally
+    if (op.args && op.args[0] && removed.includes(op.args[0]._id)
+      || typeof op.args[0] === 'string' && removed.includes(op.args[0])) continue
+
+    if (op.method === 'removeListById') {
+      removed.push(op.args[0])
+      finalOps.unshift(op)
+    } else if (op.method === 'updateListById') {
+      // keep the final result of every property if a list will be updated
+      const [listId, newList, time] = op.args
+      if (updated[listId]) {
+        for (const key in newList) {
+          if (key in updated[listId]) continue
+          updated[listId][key] = newList[key]
+        }
+        continue
+      } else {
+        updated[listId] = Object.assign({}, newList)
+        finalOps.unshift({method: 'updateListById', args: [listId, updated[listId], time]})
+      }
+    } else if (op.method === 'changeListOrderRelatively') {
+      // combine the value if a list is reordered continuously
+      if (i > 0 && ops[i - 1].method === 'changeListOrderRelatively' && op.args[0] === ops[i - 1].args[0]) {
+        ops[i - 1].args[1] += ops[i].args[1]
+      } else finalOps.unshift(op)
+    } else {
+      // do nothing if add a list
+      finalOps.unshift(op)
+    }
+  }
+  console.debug('[listManager] compress ops: (after)', finalOps)
+  return finalOps
+}
+
+const manager = {}
+// lists modifier (return true if need to add ops)
+manager.modifiers = {
+  [ADD_LIST](lists, [list]) {
+    if (~lists.findIndex(i => i._id === list._id)) return
+    lists.unshift(list)
+    return [list]
+  },
+  [UPDATE_LIST_BY_ID](lists, [listId, newList, time = Date.now()]) {
+    const normal = Object.keys(newList).some(k => SYNCED_LIST_PROPS.includes(k))
+    for (let i = 0; i < lists.length; i += 1) {
+      if (lists[i]._id !== listId) continue
+      const list = lists[i]
+      for (const [k, v] of Object.entries(newList)) {
+        list[k] = v
+      }
+      if (normal) list.updatedAt = time
+      return normal ? [listId, newList, time] : null
+    }
+  },
+  [REMOVE_LIST_BY_ID](lists, [listId]) {
+    const index = lists.findIndex(list => list._id === listId)
+    lists.splice(index, 1)
+    return [listId]
+  },
+  [CHANGE_LIST_ORDER](lists, [listId, diff]) {
+    const index = lists.findIndex(list => list._id === listId)
+    const [list] = lists.splice(index, 1)
+    lists.splice(index + diff, 0, list)
+    return [listId, diff]
+  },
+}
+
+// use myself throttle function to replace Lodash.throttle to make sure
+// this function cannot be executed concurrently
+const saveStorage = async (lists, ops) => {
+  const unlock = await RWLock.lock()
+  const data = {
+    lists,
+    ops: compressOps(ops)
+  }
+  await chrome.storage.local.set(data)
+  cache.lists = cache.ops = null
+  await sendMessage({refresh: true})
+  await unlock()
+}
+// avoid getting storage at the same time
+const _modifyQueue = []
+const _startModifyWork = (lists, ops) => new Promise(resolve => {
+  while (_modifyQueue.length) {
+    const [method, args] = _modifyQueue.shift()
+    const opArgs = manager.modifiers[method](lists, args)
+    if (opArgs) ops.push({method, args: opArgs, time: Date.now()})
+  }
+  setTimeout(() => {
+    if (_modifyQueue.length) _startModifyWork(lists, ops).then(resolve)
+    else resolve()
+  }, 100)
+})
+
+let _working = false
+const applyChangesToStorage = async (method, args) => {
+  _modifyQueue.push([method, args])
+  // not need to start work if modify work is processing
+  if (_working) return
+  _working = true
+  const {lists, ops} = await getStorage()
+  await _startModifyWork(lists, ops)
+  // from here won't modify data if do not call start function
+  _working = false
+  await saveStorage(lists, ops)
+}
+const addEventListener = (receiveFrom, callback) => chrome.runtime.onMessage.addListener(({listModifed, from}) => {
+  if (receiveFrom !== from || !listModifed) return
+  const {method, args} = listModifed
+  return callback(method, args)
+})
+const genMethods = isBackground => {
+  Object.keys(manager.modifiers).forEach(method => {
+    manager[method] = isBackground ? async (...args) => { // for background
+      console.debug('[list manager] modify list:', method, ...args)
+      await sendMessage({listModifed: {method, args}, from: END_BACKGROUND})
+      // no need to await changes applied for close tabs immediately
+      applyChangesToStorage(method, args)
+    } : async (...args) => { // for front end
+      console.debug('[list manager] call to modify list:', name, ...args)
+      await sendMessage({listModifed: {method, args}, from: END_FRONT})
+    }
+  })
+}
+manager.init = async () => {
+  if (manager.inited) return
+  manager.inited = true
+  const _isBackground = await isBackground()
+  if (_isBackground) await addEventListener(END_FRONT, applyChangesToStorage)
+  genMethods(_isBackground)
+}
+manager.mapMutations = () => {
+  const mutations = {}
+  Object.entries(manager.modifiers).forEach(([method, fn]) => {
+    mutations[method] = (state, payload) => fn(state.lists, payload)
+  })
+  mutations.receiveData = (state, {method, args}) => {
+    manager.modifiers[method](state.lists, args)
+  }
+  return mutations
+}
+manager.createVuexPlugin = () => store => {
+  addEventListener(END_BACKGROUND, (method, args) => {
+    store.commit('receiveData', {method, args})
+  })
+  chrome.runtime.onMessage.addListener(({refreshed}) => {
+    if (refreshed && refreshed.success) store.dispatch('getLists')
+  })
+  store.subscribe(({type, payload}) => {
+    if (type in manager.modifiers) {
+      manager[type](...payload)
+    }
+  })
+}
+manager.RWLock = RWLock
+manager.isWorking = () => _working
+export default manager
+````
+
+## File: src/common/options.js
+````javascript
+import _ from 'lodash'
+import __ from '@/common/i18n'
+
+const cate = {
+  BEHAVIOUR: 'behaviour',
+  APPEARANCE: 'appearance',
+  PERFOREMANCE: 'performance',
+}
+
+export const getOptionsList = () => [
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'browserAction',
+    type: String,
+    default: 'show-list',
+    items: [
+      {
+        value: 'popup',
+        label: __('opt_label_popup'),
+      },
+      {
+        value: 'store-selected',
+        label: __('opt_label_store_selected'),
+      },
+      {
+        value: 'store-all',
+        label: __('opt_label_store_all'),
+      },
+      {
+        value: 'show-list',
+        label: __('opt_label_show_list'),
+      },
+      {
+        value: 'none',
+        label: __('opt_label_none'),
+      },
+    ],
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'itemClickAction',
+    type: String,
+    default: 'open-and-remove',
+    items: [
+      {
+        value: 'open-and-remove',
+        label: __('opt_label_open_and_remove'),
+      },
+      {
+        value: 'open',
+        label: __('opt_label_open'),
+      },
+      {
+        value: 'none',
+        label: __('opt_label_none'),
+      },
+    ],
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'popupItemClickAction',
+    type: String,
+    default: 'restore',
+    items: [
+      {
+        value: 'restore',
+        label: __('opt_label_restore'),
+      },
+      {
+        value: 'restore-new-window',
+        label: __('opt_label_restore_new_window'),
+      },
+      {
+        value: 'none',
+        label: __('opt_label_none'),
+      },
+    ],
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'removeItemBtnPos',
+    type: String,
+    default: 'left',
+    items: [
+      {
+        value: 'left',
+        label: __('opt_label_left'),
+      },
+      {
+        value: 'right',
+        label: __('opt_label_right'),
+      },
+    ],
+    deprecated: '1.4',
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'defaultNightMode',
+    type: Boolean,
+    default: false,
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'itemDisplay',
+    type: String,
+    default: 'title-and-url',
+    items: [
+      {
+        value: 'title-and-url',
+        label: __('opt_label_title_and_url'),
+      },
+      {
+        value: 'title',
+        label: __('opt_label_title'),
+      },
+      {
+        value: 'url',
+        label: __('opt_label_url'),
+      },
+    ],
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'hideFavicon',
+    type: Boolean,
+    default: false,
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'fixedToolbar',
+    type: Boolean,
+    default: false,
+    deprecated: '1.4',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'addHistory',
+    type: Boolean,
+    default: true,
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'ignorePinned',
+    type: Boolean,
+    default: false,
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'pinNewList',
+    type: Boolean,
+    default: false,
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'pageContext',
+    type: Boolean,
+    default: true,
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'allContext',
+    type: Boolean,
+    default: false,
+    deps: ({ pageContext }) => pageContext,
+    new: '1.3.6',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'openTabListWhenNewTab',
+    desc: true,
+    deps: ({ disableDynamicMenu }) => !disableDynamicMenu,
+    type: Boolean,
+    default: false,
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'alertRemoveList',
+    type: Boolean,
+    default: false,
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'excludeIllegalURL',
+    type: Boolean,
+    default: true,
+    new: '1.3.6',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'removeDuplicate',
+    type: Boolean,
+    default: false,
+    new: '1.3.6',
+  },
+  // START - Comment out Boss sync options
+  /*
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'useBoss',
+    type: Boolean,
+    default: false,
+    new: '1.3.0',
+    desc: true,
+  },
+  */
+  // END - Comment out Boss sync options
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'syncBaseUrl',
+    type: String,
+    default: 'http://localhost:8000',
+    new: '1.4.1',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'syncApiKey',
+    type: String,
+    default: '',
+    new: '1.4.1',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'autoSyncEnabled',
+    type: Boolean,
+    default: false,
+    new: '1.4.1',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'autoSyncInterval',
+    type: Number,
+    default: 300,
+    new: '1.4.1',
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'enableSearch',
+    type: Boolean,
+    default: true,
+    new: '1.3.7',
+    deprecated: '1.4',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'openEnd',
+    type: Boolean,
+    default: true,
+    new: '1.3.9',
+  },
+  {
+    cate: cate.BEHAVIOUR,
+    name: 'openTabListNoTab',
+    type: Boolean,
+    default: true,
+    new: '1.4.0',
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'listsPerPage',
+    type: String,
+    default: 10,
+    items: [
+      {
+        value: 5,
+        label: 5,
+      },
+      {
+        value: 10,
+        label: 10,
+      },
+      {
+        value: 15,
+        label: 15,
+      },
+    ],
+    new: '1.4.0',
+  },
+  {
+    cate: cate.APPEARANCE,
+    name: 'titleFontSize',
+    type: String,
+    default: '12px',
+    items: [
+      {
+        value: '12px',
+        label: '12px',
+      },
+      {
+        value: '18px',
+        label: '18px',
+      },
+      {
+        value: '24px',
+        label: '24px',
+      },
+    ],
+    new: '1.4.0',
+  },
+  {
+    cate: cate.PERFOREMANCE,
+    name: 'disableDynamicMenu',
+    type: Boolean,
+    default: false,
+    new: '1.4.0',
+  },
+  {
+    cate: cate.PERFOREMANCE,
+    name: 'disableExpansion',
+    type: Boolean,
+    default: false,
+    new: '1.4.0',
+  },
+  {
+    cate: cate.PERFOREMANCE,
+    name: 'disableTransition',
+    type: Boolean,
+    default: false,
+    new: '1.4.0',
+  },
+  {
+    cate: cate.PERFOREMANCE,
+    name: 'disableSearch',
+    type: Boolean,
+    default: false,
+    new: '1.4.0',
+  },
+].filter(i => !i.deprecated)
+
+const _defaultOptions = _.mapValues(_.keyBy(getOptionsList(), 'name'), i => i.default)
+const getDefaultOptions = () => _defaultOptions
+
+export default { getDefaultOptions, getOptionsList }
+````
+
 ## File: src/background/browserAction.js
 ````javascript
 import tabs from '../common/tabs'
@@ -6143,7 +6016,7 @@ export const getBrowserActionHandler = (action) => {
   const handlers = {
     'store-selected': tabs.storeSelectedTabs,
     'store-all': tabs.storeAllTabs,
-    'show-list': tabs.openTabLists,
+    'show-list': tabs.openlists,
   }
   return handlers[action] || null
 }
@@ -6603,695 +6476,6 @@ export default {
 }
 ````
 
-## File: src/background/messageHandler.js
-````javascript
-import tabs from '../common/tabs'
-import storage from '../common/storage'
-// import boss from '../common/service/boss' // Keep import commented if you previously uncommented it for boss.js
-import { sendMessage } from '../common/utils'
-import listManager from '../common/listManager'
-import { setupContextMenus } from './contextMenus'
-import { updateBrowserAction } from './browserAction'
-import { ILLEGAL_URLS, RUNTIME_MESSAGES } from '../common/constants'
-const getExtensionUrlPrefix = () => chrome.runtime.getURL('')
-
-const isBlockedStashTarget = url => {
-  if (!url) return true
-  const extensionUrl = getExtensionUrlPrefix()
-  if (url.startsWith(extensionUrl)) return true
-  return ILLEGAL_URLS.some(prefix => url.startsWith(prefix))
-}
-
-const emitStashEvent = (type, payload) => {
-  return chrome.runtime.sendMessage({
-    type,
-    payload,
-  }).catch(() => {
-    // It's fine if no UI is listening.
-  })
-}
-
-const handleStashCurrentTabIntent = async (source = 'app') => {
-  try {
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
-    if (!activeTab || !activeTab.id) {
-      throw new Error('NO_ACTIVE_TAB')
-    }
-    if (isBlockedStashTarget(activeTab.url)) {
-      throw new Error('BLOCKED_URL')
-    }
-    await tabs.storeCurrentTab()
-    await emitStashEvent(RUNTIME_MESSAGES.STASH_COMPLETED, {
-      source,
-      tabId: activeTab.id,
-      title: activeTab.title,
-      url: activeTab.url,
-    })
-  } catch (error) {
-    await emitStashEvent(RUNTIME_MESSAGES.STASH_FAILED, {
-      source,
-      reason: error.message || 'UNKNOWN',
-    })
-    console.error('[SquirrlTab] Failed to stash current tab intent:', error)
-  }
-}
-
-const messageHandler = async msg => {
-  if (!msg) return
-
-  if (msg.type === "REQUEST_SAVE_TAB") {
-    await tabs.storeCurrentTab()
-
-    chrome.runtime.sendMessage({
-      type: "LISTS_UPDATED",
-    })
-
-    return
-  }
-
-
-  if (msg.type === RUNTIME_MESSAGES.STASH_COMPLETED || msg.type === RUNTIME_MESSAGES.STASH_FAILED) {
-    return
-  }
-  if (msg.type === RUNTIME_MESSAGES.STASH_CURRENT_TAB) {
-    const source = msg.payload?.source || 'app'
-    handleStashCurrentTabIntent(source)
-    return
-  }
-  console.debug('received', msg)
-  if (msg.optionsChanged) {
-    const changes = msg.optionsChanged
-    console.debug('options changed', changes)
-
-    const latestOpts = await storage.getOptions()
-    Object.assign(latestOpts, changes)
-    await storage.setOptions(latestOpts)
-
-    if (changes.browserAction) updateBrowserAction(changes.browserAction)
-    if (['pageContext', 'allContext', 'disableDynamicMenu'].some(k => k in changes)) {
-      await setupContextMenus(latestOpts)
-    }
-    await sendMessage({ optionsChangeHandledStatus: 'success' })
-  }
-  if (msg.restoreList) {
-    const { restoreList } = msg
-    const listIndex = restoreList.index
-    const lists = await storage.getLists()
-    const list = lists[listIndex]
-    if (restoreList.newWindow) {
-      tabs.restoreListInNewWindow(list)
-    } else {
-      tabs.restoreList(list)
-    }
-    if (!list.pinned) {
-      listManager.removeListById(list._id)
-    }
-  }
-  if (msg.storeInto) {
-    tabs.storeSelectedTabs(msg.storeInto.index)
-  }
-  /*
-  if (msg.login) {
-    boss.login(msg.login.token)
-  }
-  if (msg.refresh) {
-    boss.refresh()
-  }
-  */
-    if (msg.import) {
-    const { lists } = msg.import
-    lists.forEach(list => listManager.addList(list))
-
-    chrome.runtime.sendMessage({
-      type: "LISTS_UPDATED",
-    })
-    return
-  }
-}
-export default messageHandler
-````
-
-## File: src/common/constants.js
-````javascript
-export const COLORS = [
-  '', 'red', 'pink', 'purple',
-  'indigo', 'blue', 'cyan', 'teal',
-  'green', 'yellow', 'orange', 'brown',
-]
-
-export const ILLEGAL_URLS = ['about:', 'chrome:', 'file:', 'wss:', 'ws:']
-
-export const PICKED_TAB_PROPS = ['url', 'title', 'favIconUrl', 'pinned']
-export const PICKED_LIST_RPOPS = ['_id', 'tabs', 'title', 'tags', 'category', 'time', 'pinned', 'expand', 'color', 'updatedAt']
-export const SYNCED_LIST_PROPS = ['_id', 'tabs', 'title', 'tags', 'category', 'time', 'pinned', 'color']
-
-export const TOKEN_KEY = 'token'
-export const AUTH_HEADER = 'auth'
-
-export const END_FRONT = 'front'
-export const END_BACKGROUND = 'background'
-
-export const SYNC_SERVICE_URL = DEBUG ? 'http://127.0.0.1:8000' : 'https://boss.cnwangjie.com'
-export const SYNC_MAX_INTERVAL = 864e5
-export const SYNC_MIN_INTERVAL = 3e5
-
-export const SYNC_PHASES = {
-  IDLE: 'idle',
-  SYNCING: 'syncing',
-  SYNCED: 'synced',
-  AUTH_ERROR: 'auth-error',
-  OFFLINE: 'offline',
-  SERVER_ERROR: 'server-error',
-  NEVER_SYNCED: 'never-synced',
-  LOCAL_ONLY: 'local-only',
-}
-
-export const ADD_LIST = 'addList'
-export const UPDATE_LIST_BY_ID = 'updateListById'
-export const REMOVE_LIST_BY_ID = 'removeListById'
-export const CHANGE_LIST_ORDER = 'changeListOrderRelatively'
-
-export const SENTRY_DSN = 'https://3a924dd322e24dbca1c28364de767ffc@sentry.io/1307154'
-
-export const RUNTIME_MESSAGES = {
-  STASH_CURRENT_TAB: 'STASH_CURRENT_TAB',
-  STASH_COMPLETED: 'STASH_COMPLETED',
-  STASH_FAILED: 'STASH_FAILED',
-}
-````
-
-## File: src/common/listManager.js
-````javascript
-import {
-  SYNCED_LIST_PROPS,
-  END_FRONT,
-  END_BACKGROUND,
-  ADD_LIST,
-  UPDATE_LIST_BY_ID,
-  REMOVE_LIST_BY_ID,
-  CHANGE_LIST_ORDER,
-} from './constants'
-import {isBackground, sendMessage, Mutex} from './utils'
-
-const cache = { lists: null, ops: null }
-const RWLock = new Mutex()
-const getStorage = async () => {
-  const unlockRW = await RWLock.lock()
-  if (cache.lists && cache.ops) return cache
-  const {lists, ops} = await chrome.storage.local.get(['lists', 'ops'])
-  cache.lists = lists || []
-  cache.ops = ops || []
-  await unlockRW()
-  return cache
-}
-const compressOps = ops => {
-  console.debug('[listManager] compress ops: (before)', ops)
-  const removed = []
-  const updated = {}
-  const finalOps = []
-  for (let i = ops.length - 1; i > -1; i -= 1) {
-    const op = ops[i]
-    // ignore all actions for the list if that list will be removed finally
-    if (op.args && op.args[0] && removed.includes(op.args[0]._id)
-      || typeof op.args[0] === 'string' && removed.includes(op.args[0])) continue
-
-    if (op.method === 'removeListById') {
-      removed.push(op.args[0])
-      finalOps.unshift(op)
-    } else if (op.method === 'updateListById') {
-      // keep the final result of every property if a list will be updated
-      const [listId, newList, time] = op.args
-      if (updated[listId]) {
-        for (const key in newList) {
-          if (key in updated[listId]) continue
-          updated[listId][key] = newList[key]
-        }
-        continue
-      } else {
-        updated[listId] = Object.assign({}, newList)
-        finalOps.unshift({method: 'updateListById', args: [listId, updated[listId], time]})
-      }
-    } else if (op.method === 'changeListOrderRelatively') {
-      // combine the value if a list is reordered continuously
-      if (i > 0 && ops[i - 1].method === 'changeListOrderRelatively' && op.args[0] === ops[i - 1].args[0]) {
-        ops[i - 1].args[1] += ops[i].args[1]
-      } else finalOps.unshift(op)
-    } else {
-      // do nothing if add a list
-      finalOps.unshift(op)
-    }
-  }
-  console.debug('[listManager] compress ops: (after)', finalOps)
-  return finalOps
-}
-
-const manager = {}
-// lists modifier (return true if need to add ops)
-manager.modifiers = {
-  [ADD_LIST](lists, [list]) {
-    if (~lists.findIndex(i => i._id === list._id)) return
-    lists.unshift(list)
-    return [list]
-  },
-  [UPDATE_LIST_BY_ID](lists, [listId, newList, time = Date.now()]) {
-    const normal = Object.keys(newList).some(k => SYNCED_LIST_PROPS.includes(k))
-    for (let i = 0; i < lists.length; i += 1) {
-      if (lists[i]._id !== listId) continue
-      const list = lists[i]
-      for (const [k, v] of Object.entries(newList)) {
-        list[k] = v
-      }
-      if (normal) list.updatedAt = time
-      return normal ? [listId, newList, time] : null
-    }
-  },
-  [REMOVE_LIST_BY_ID](lists, [listId]) {
-    const index = lists.findIndex(list => list._id === listId)
-    lists.splice(index, 1)
-    return [listId]
-  },
-  [CHANGE_LIST_ORDER](lists, [listId, diff]) {
-    const index = lists.findIndex(list => list._id === listId)
-    const [list] = lists.splice(index, 1)
-    lists.splice(index + diff, 0, list)
-    return [listId, diff]
-  },
-}
-
-// use myself throttle function to replace Lodash.throttle to make sure
-// this function cannot be executed concurrently
-const saveStorage = async (lists, ops) => {
-  const unlock = await RWLock.lock()
-  const data = {
-    lists,
-    ops: compressOps(ops)
-  }
-  await chrome.storage.local.set(data)
-  cache.lists = cache.ops = null
-  await sendMessage({refresh: true})
-  await unlock()
-}
-// avoid getting storage at the same time
-const _modifyQueue = []
-const _startModifyWork = (lists, ops) => new Promise(resolve => {
-  while (_modifyQueue.length) {
-    const [method, args] = _modifyQueue.shift()
-    const opArgs = manager.modifiers[method](lists, args)
-    if (opArgs) ops.push({method, args: opArgs, time: Date.now()})
-  }
-  setTimeout(() => {
-    if (_modifyQueue.length) _startModifyWork(lists, ops).then(resolve)
-    else resolve()
-  }, 100)
-})
-
-let _working = false
-const applyChangesToStorage = async (method, args) => {
-  _modifyQueue.push([method, args])
-  // not need to start work if modify work is processing
-  if (_working) return
-  _working = true
-  const {lists, ops} = await getStorage()
-  await _startModifyWork(lists, ops)
-  // from here won't modify data if do not call start function
-  _working = false
-  await saveStorage(lists, ops)
-}
-const addEventListener = (receiveFrom, callback) => chrome.runtime.onMessage.addListener(({listModifed, from}) => {
-  if (receiveFrom !== from || !listModifed) return
-  const {method, args} = listModifed
-  return callback(method, args)
-})
-const genMethods = isBackground => {
-  Object.keys(manager.modifiers).forEach(method => {
-    manager[method] = isBackground ? async (...args) => { // for background
-      console.debug('[list manager] modify list:', method, ...args)
-      await sendMessage({listModifed: {method, args}, from: END_BACKGROUND})
-      // no need to await changes applied for close tabs immediately
-      applyChangesToStorage(method, args)
-    } : async (...args) => { // for front end
-      console.debug('[list manager] call to modify list:', name, ...args)
-      await sendMessage({listModifed: {method, args}, from: END_FRONT})
-    }
-  })
-}
-manager.init = async () => {
-  if (manager.inited) return
-  manager.inited = true
-  const _isBackground = await isBackground()
-  if (_isBackground) await addEventListener(END_FRONT, applyChangesToStorage)
-  genMethods(_isBackground)
-}
-manager.mapMutations = () => {
-  const mutations = {}
-  Object.entries(manager.modifiers).forEach(([method, fn]) => {
-    mutations[method] = (state, payload) => fn(state.lists, payload)
-  })
-  mutations.receiveData = (state, {method, args}) => {
-    manager.modifiers[method](state.lists, args)
-  }
-  return mutations
-}
-manager.createVuexPlugin = () => store => {
-  addEventListener(END_BACKGROUND, (method, args) => {
-    store.commit('receiveData', {method, args})
-  })
-  chrome.runtime.onMessage.addListener(({refreshed}) => {
-    if (refreshed && refreshed.success) store.dispatch('getLists')
-  })
-  store.subscribe(({type, payload}) => {
-    if (type in manager.modifiers) {
-      manager[type](...payload)
-    }
-  })
-}
-manager.RWLock = RWLock
-manager.isWorking = () => _working
-export default manager
-````
-
-## File: src/common/options.js
-````javascript
-import _ from 'lodash'
-import __ from '@/common/i18n'
-
-const cate = {
-  BEHAVIOUR: 'behaviour',
-  APPEARANCE: 'appearance',
-  PERFOREMANCE: 'performance',
-}
-
-export const getOptionsList = () => [
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'browserAction',
-    type: String,
-    default: 'show-list',
-    items: [
-      {
-        value: 'popup',
-        label: __('opt_label_popup'),
-      },
-      {
-        value: 'store-selected',
-        label: __('opt_label_store_selected'),
-      },
-      {
-        value: 'store-all',
-        label: __('opt_label_store_all'),
-      },
-      {
-        value: 'show-list',
-        label: __('opt_label_show_list'),
-      },
-      {
-        value: 'none',
-        label: __('opt_label_none'),
-      },
-    ],
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'itemClickAction',
-    type: String,
-    default: 'open-and-remove',
-    items: [
-      {
-        value: 'open-and-remove',
-        label: __('opt_label_open_and_remove'),
-      },
-      {
-        value: 'open',
-        label: __('opt_label_open'),
-      },
-      {
-        value: 'none',
-        label: __('opt_label_none'),
-      },
-    ],
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'popupItemClickAction',
-    type: String,
-    default: 'restore',
-    items: [
-      {
-        value: 'restore',
-        label: __('opt_label_restore'),
-      },
-      {
-        value: 'restore-new-window',
-        label: __('opt_label_restore_new_window'),
-      },
-      {
-        value: 'none',
-        label: __('opt_label_none'),
-      },
-    ],
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'removeItemBtnPos',
-    type: String,
-    default: 'left',
-    items: [
-      {
-        value: 'left',
-        label: __('opt_label_left'),
-      },
-      {
-        value: 'right',
-        label: __('opt_label_right'),
-      },
-    ],
-    deprecated: '1.4',
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'defaultNightMode',
-    type: Boolean,
-    default: false,
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'itemDisplay',
-    type: String,
-    default: 'title-and-url',
-    items: [
-      {
-        value: 'title-and-url',
-        label: __('opt_label_title_and_url'),
-      },
-      {
-        value: 'title',
-        label: __('opt_label_title'),
-      },
-      {
-        value: 'url',
-        label: __('opt_label_url'),
-      },
-    ],
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'hideFavicon',
-    type: Boolean,
-    default: false,
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'fixedToolbar',
-    type: Boolean,
-    default: false,
-    deprecated: '1.4',
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'addHistory',
-    type: Boolean,
-    default: true,
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'ignorePinned',
-    type: Boolean,
-    default: false,
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'pinNewList',
-    type: Boolean,
-    default: false,
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'pageContext',
-    type: Boolean,
-    default: true,
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'allContext',
-    type: Boolean,
-    default: false,
-    deps: ({ pageContext }) => pageContext,
-    new: '1.3.6',
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'openTabListWhenNewTab',
-    desc: true,
-    deps: ({ disableDynamicMenu }) => !disableDynamicMenu,
-    type: Boolean,
-    default: false,
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'alertRemoveList',
-    type: Boolean,
-    default: false,
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'excludeIllegalURL',
-    type: Boolean,
-    default: true,
-    new: '1.3.6',
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'removeDuplicate',
-    type: Boolean,
-    default: false,
-    new: '1.3.6',
-  },
-  // START - Comment out Boss sync options
-  /*
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'useBoss',
-    type: Boolean,
-    default: false,
-    new: '1.3.0',
-    desc: true,
-  },
-  */
-  // END - Comment out Boss sync options
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'syncBaseUrl',
-    type: String,
-    default: 'http://localhost:8000',
-    new: '1.4.1',
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'syncApiKey',
-    type: String,
-    default: '',
-    new: '1.4.1',
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'enableSearch',
-    type: Boolean,
-    default: true,
-    new: '1.3.7',
-    deprecated: '1.4',
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'openEnd',
-    type: Boolean,
-    default: true,
-    new: '1.3.9',
-  },
-  {
-    cate: cate.BEHAVIOUR,
-    name: 'openTabListNoTab',
-    type: Boolean,
-    default: true,
-    new: '1.4.0',
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'listsPerPage',
-    type: String,
-    default: 10,
-    items: [
-      {
-        value: 5,
-        label: 5,
-      },
-      {
-        value: 10,
-        label: 10,
-      },
-      {
-        value: 15,
-        label: 15,
-      },
-    ],
-    new: '1.4.0',
-  },
-  {
-    cate: cate.APPEARANCE,
-    name: 'titleFontSize',
-    type: String,
-    default: '12px',
-    items: [
-      {
-        value: '12px',
-        label: '12px',
-      },
-      {
-        value: '18px',
-        label: '18px',
-      },
-      {
-        value: '24px',
-        label: '24px',
-      },
-    ],
-    new: '1.4.0',
-  },
-  {
-    cate: cate.PERFOREMANCE,
-    name: 'disableDynamicMenu',
-    type: Boolean,
-    default: false,
-    new: '1.4.0',
-  },
-  {
-    cate: cate.PERFOREMANCE,
-    name: 'disableExpansion',
-    type: Boolean,
-    default: false,
-    new: '1.4.0',
-  },
-  {
-    cate: cate.PERFOREMANCE,
-    name: 'disableTransition',
-    type: Boolean,
-    default: false,
-    new: '1.4.0',
-  },
-  {
-    cate: cate.PERFOREMANCE,
-    name: 'disableSearch',
-    type: Boolean,
-    default: false,
-    new: '1.4.0',
-  },
-].filter(i => !i.deprecated)
-
-const _defaultOptions = _.mapValues(_.keyBy(getOptionsList(), 'name'), i => i.default)
-const getDefaultOptions = () => _defaultOptions
-
-export default { getDefaultOptions, getOptionsList }
-````
-
 ## File: src/app/router/index.js
 ````javascript
 // src/app/router/index.js
@@ -7592,6 +6776,624 @@ export default {
   },
 
 }
+````
+
+## File: src/app/store/syncStore.svelte.js
+````javascript
+import browser from 'webextension-polyfill'
+import CustomSync, { SyncError } from '@/common/service/custom-sync'
+import storage from '@/common/storage'
+import { createNewTabList } from '@/common/list'
+import { SYNC_PHASES, RUNTIME_MESSAGES } from '@/common/constants'
+import { logSyncEvent } from '@/common/sync-logger'
+import tabsHelper from '@/common/tabs'
+import manager from './bridge'
+import _ from 'lodash'
+
+const RETRY_DELAY = 10000
+
+const getListTimestamp = list => list?.updatedAt || list?.time || 0
+const buildSignature = lists => (lists || []).map(list => `${list._id}:${getListTimestamp(list)}:${list.tabs?.length || 0}`).join('|')
+const computeVersion = lists => (lists || []).reduce((acc, list) => Math.max(acc, getListTimestamp(list)), 0)
+const parseRemoteVersion = value => {
+  if (!value) return 0
+  if (typeof value === 'number') return value
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+const mapRemoteList = remote =>
+  createNewTabList({
+    _id: remote.remote_id,
+    title: remote.title,
+    tabs: remote.tabs || [],
+    tags: remote.tags || [],
+    category: remote.category || '',
+    time: remote.time || Date.now(),
+    pinned: remote.pinned,
+    color: remote.color || '',
+    updatedAt: remote.updated_at || remote.time || Date.now(),
+  })
+
+let pendingPayload = null
+let retryTimer = null
+let autoSyncTimer = null
+
+const isAutoSyncEnabled = opts => opts?.autoSyncEnabled !== false
+const getAutoSyncIntervalMs = opts => {
+  const intervalSeconds = Number(opts?.autoSyncInterval)
+  if (!Number.isFinite(intervalSeconds) || intervalSeconds <= 0) return null
+  return intervalSeconds * 1000
+}
+
+const clearAutoSyncTimer = () => {
+  if (!autoSyncTimer) return
+  clearInterval(autoSyncTimer)
+  autoSyncTimer = null
+}
+
+const setupAutoSyncTimer = () => {
+  clearAutoSyncTimer()
+  if (!isAutoSyncEnabled(state.opts)) return
+  const intervalMs = getAutoSyncIntervalMs(state.opts)
+  if (!intervalMs) return
+  autoSyncTimer = setInterval(() => {
+    if (!state.initialized) return
+    scheduleSync('auto-interval')
+  }, intervalMs)
+}
+
+let state = $state({
+  lists: [],
+  opts: {},
+  aiLoading: null,
+  syncing: false,
+  snackbar: { status: false, msg: '' },
+  initialized: false,
+  lastSyncSuccess: null,
+  syncPhase: SYNC_PHASES.NEVER_SYNCED,
+  syncError: null,
+  localOnly: false,
+  lastSyncedAt: null,
+  lastSyncedSignature: '',
+  remoteVersion: 0,
+  pendingRetry: null,
+})
+
+const normalizeSyncError = error => {
+  if (error instanceof SyncError) {
+    const phaseMap = {
+      offline: SYNC_PHASES.OFFLINE,
+      auth: SYNC_PHASES.AUTH_ERROR,
+      server: SYNC_PHASES.SERVER_ERROR,
+    }
+    return {
+      code: error.code || 'unknown',
+      message: error.message,
+      status: error.status,
+      phase: phaseMap[error.code] || SYNC_PHASES.SERVER_ERROR,
+    }
+  }
+  return {
+    code: 'unknown',
+    message: error?.message || 'Unexpected sync failure',
+    status: null,
+    phase: SYNC_PHASES.SERVER_ERROR,
+  }
+}
+
+const scheduleRetry = () => {
+  if (!state.pendingRetry || retryTimer) return
+  logSyncEvent('retry_scheduled', {
+    delayMs: RETRY_DELAY,
+    reason: state.pendingRetry?.reason || 'unknown',
+  })
+  retryTimer = setTimeout(() => {
+    retryTimer = null
+    if (!state.pendingRetry) return
+    pendingPayload = state.pendingRetry
+    pushStateToServer(state.pendingRetry)
+  }, RETRY_DELAY)
+}
+
+const pushStateToServer = async payload => {
+  if (!payload) return
+  state.syncing = true
+  state.syncPhase = SYNC_PHASES.SYNCING
+  try {
+    const response = await CustomSync.syncState(payload.lists)
+    const remoteVersion = parseRemoteVersion(response?.updated_at) || computeVersion(payload.lists)
+    state.lastSyncedSignature = payload.signature
+    state.remoteVersion = remoteVersion
+    state.lastSyncedAt = Date.now()
+    state.lastSyncSuccess = true
+    state.syncPhase = SYNC_PHASES.SYNCED
+    state.syncError = null
+    state.localOnly = false
+    state.pendingRetry = null
+    pendingPayload = null
+    logSyncEvent('push_success', {
+      listCount: payload.lists?.length || 0,
+      signature: payload.signature,
+      reason: payload.reason,
+      remoteVersion,
+    })
+    if (retryTimer) {
+      clearTimeout(retryTimer)
+      retryTimer = null
+    }
+  } catch (error) {
+    const normalized = normalizeSyncError(error)
+    state.lastSyncSuccess = false
+    state.syncPhase = normalized.phase
+    state.syncError = normalized
+    state.localOnly = true
+    state.pendingRetry = payload
+    scheduleRetry()
+    logSyncEvent('push_failed', {
+      code: normalized.code,
+      phase: normalized.phase,
+      message: normalized.message,
+      listCount: payload?.lists?.length || 0,
+      reason: payload?.reason,
+    })
+    console.error('[SquirrlTab] Sync failed:', error)
+  } finally {
+    state.syncing = false
+  }
+}
+
+const debouncedPush = _.debounce(() => {
+  if (!pendingPayload) return
+  pushStateToServer(pendingPayload)
+}, 1200)
+
+const scheduleSync = (reason = 'change', { immediate = false, listsOverride = null, signatureOverride = null, force = false } = {}) => {
+  if (!state.initialized) return
+  if (!force && !isAutoSyncEnabled(state.opts)) return
+  const lists = listsOverride || $state.snapshot(state.lists)
+  const signature = signatureOverride || buildSignature(lists)
+  if (!force && signature === state.lastSyncedSignature) return
+  pendingPayload = { lists, signature, reason }
+  // FIX (Bug 2): Only mark as LOCAL_ONLY if we are not already in an
+  // in-flight or error state.  The badge will flip to SYNCING as soon as
+  // pushStateToServer actually runs, so we only need a brief LOCAL_ONLY
+  // window when transitioning from a stable state.
+  if ([SYNC_PHASES.SYNCED, SYNC_PHASES.IDLE, SYNC_PHASES.NEVER_SYNCED].includes(state.syncPhase)) {
+    state.localOnly = true
+    state.syncPhase = SYNC_PHASES.LOCAL_ONLY
+  }
+  if (immediate) {
+    debouncedPush.cancel()
+    pushStateToServer(pendingPayload)
+  } else {
+    debouncedPush()
+  }
+}
+
+const hydrateFromRemote = async () => {
+  if (!isAutoSyncEnabled(state.opts)) return
+  state.syncing = true
+  state.syncPhase = SYNC_PHASES.SYNCING
+  logSyncEvent('hydrate_started')
+  try {
+    const response = await CustomSync.download()
+    const remoteLists = Array.isArray(response?.lists) ? response.lists : []
+    const normalizedRemote = remoteLists.map(mapRemoteList)
+    const remoteVersion = parseRemoteVersion(response?.updated_at) || computeVersion(normalizedRemote)
+    state.remoteVersion = remoteVersion
+
+    // FIX (Bug 1): Re-read local storage RIGHT NOW instead of relying on
+    // the snapshot that was taken before the network round-trip.  A stash
+    // operation (or any other write) may have completed while we were
+    // waiting for the server to respond.  Using a stale snapshot here would
+    // cause us to clobber freshly-stashed tabs with the (older) remote set.
+    const freshLocalData = await browser.storage.local.get('lists')
+    const localSnapshot = Array.isArray(freshLocalData.lists) ? freshLocalData.lists : []
+    const localVersion = computeVersion(localSnapshot)
+
+    if (remoteVersion > localVersion) {
+      const signature = buildSignature(normalizedRemote)
+      state.lastSyncedSignature = signature
+      state.remoteVersion = remoteVersion
+      state.lastSyncSuccess = true
+      state.localOnly = false
+      state.syncError = null
+      await storage.setLists(normalizedRemote)
+      state.lastSyncedAt = Date.now()
+      state.syncPhase = SYNC_PHASES.SYNCED
+      logSyncEvent('hydrate_success', {
+        action: 'downloaded',
+        remoteLists: normalizedRemote.length,
+        localLists: localSnapshot.length,
+        remoteVersion,
+        localVersion,
+      })
+    } else if (localVersion > remoteVersion && localSnapshot.length) {
+      state.localOnly = true
+      state.syncPhase = SYNC_PHASES.LOCAL_ONLY
+      logSyncEvent('hydrate_success', {
+        action: 'upload_scheduled',
+        remoteLists: normalizedRemote.length,
+        localLists: localSnapshot.length,
+        remoteVersion,
+        localVersion,
+      })
+      scheduleSync('remote-behind', { immediate: true, listsOverride: localSnapshot, signatureOverride: buildSignature(localSnapshot), force: true })
+    } else {
+      state.localOnly = false
+      state.syncPhase = SYNC_PHASES.SYNCED
+      logSyncEvent('hydrate_success', {
+        action: 'unchanged',
+        remoteLists: normalizedRemote.length,
+        localLists: localSnapshot.length,
+        remoteVersion,
+        localVersion,
+      })
+    }
+  } catch (error) {
+    const normalized = normalizeSyncError(error)
+    state.syncPhase = normalized.phase
+    state.syncError = normalized
+    state.lastSyncSuccess = false
+    state.localOnly = true
+    
+    // FORCE LOCAL DATA TO PERSIST
+    // This prevents the UI from clearing or hiding the lists 
+    // just because the server at localhost:8000 is down.
+    if (state.lists.length === 0) {
+       const data = await browser.storage.local.get('lists');
+       state.lists = Array.isArray(data.lists) ? data.lists : [];
+    }
+
+    logSyncEvent('hydrate_failed', {
+      code: normalized.code,
+      phase: normalized.phase,
+      message: normalized.message,
+    })
+    console.error('[SquirrlTab] Failed to hydrate remote state:', error)
+  } finally {
+    state.syncing = false
+    // Ensure initialized is true so the UI knows it's okay to render
+    state.initialized = true 
+  }
+}
+
+const initStore = async (retries = 3) => {
+  let shouldFinalize = true
+  try {
+    const data = await browser.storage.local.get(['lists', 'opts'])
+    state.lists = Array.isArray(data.lists) ? data.lists : []
+    state.opts = data.opts || {}
+    state.lastSyncedSignature = buildSignature(state.lists)
+    state.remoteVersion = computeVersion(state.lists)
+    state.lastSyncSuccess = null
+    state.localOnly = false
+    state.syncError = null
+    state.syncPhase = isAutoSyncEnabled(state.opts) ? SYNC_PHASES.IDLE : SYNC_PHASES.NEVER_SYNCED
+  } catch (error) {
+    console.error('[SquirrlTab] Failed to initialize store:', error)
+    if (retries > 0) {
+      shouldFinalize = false
+      setTimeout(() => initStore(retries - 1), 500)
+      return
+    }
+    state.lists = []
+    state.opts = {}
+    state.lastSyncSuccess = false
+    state.localOnly = true
+    state.syncPhase = SYNC_PHASES.LOCAL_ONLY
+  } finally {
+    if (shouldFinalize) {
+      state.initialized = true
+      setupAutoSyncTimer()
+      if (isAutoSyncEnabled(state.opts)) {
+        hydrateFromRemote()
+      }
+    }
+  }
+}
+
+initStore()
+
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') return
+  if (changes.lists) {
+    const newLists = changes.lists.newValue
+    state.lists = Array.isArray(newLists) ? newLists : []
+    console.log('[SquirrlTab] Lists updated from storage:', state.lists.length)
+  }
+  if (changes.opts) {
+    state.opts = changes.opts.newValue || {}
+    console.log('[SquirrlTab] Options updated from storage')
+    setupAutoSyncTimer()
+  }
+})
+
+$effect.root(() => {
+  $effect(() => {
+    if (!state.initialized) return
+    const snapshot = $state.snapshot(state.lists)
+    const signature = buildSignature(snapshot)
+    scheduleSync('change', { listsOverride: snapshot, signatureOverride: signature })
+  })
+})
+  
+
+export const syncStore = {
+  get lists() {
+    return state.lists
+  },
+  get opts() {
+    return state.opts
+  },
+  get aiLoading() {
+    return state.aiLoading
+  },
+  get syncing() {
+    return state.syncing
+  },
+  get snackbar() {
+    return state.snackbar
+  },
+  get initialized() {
+    return state.initialized
+  },
+  get lastSyncSuccess() {
+    return state.lastSyncSuccess
+  },
+  get syncStatus() {
+    return {
+      phase: state.syncPhase,
+      syncing: state.syncing,
+      error: state.syncError,
+      lastSyncedAt: state.lastSyncedAt,
+      localOnly: state.localOnly,
+      pendingRetry: Boolean(state.pendingRetry),
+      lastSyncSuccess: state.lastSyncSuccess,
+    }
+  },
+  updateSnackbar(payload) {
+    if (typeof payload === 'string') {
+      state.snackbar = { status: true, msg: payload }
+    } else {
+      state.snackbar = payload
+    }
+  },
+  get pinnedLists() {
+    return state.lists.filter(list => list.pinned)
+  },
+  get taggedLists() {
+    const tagged = {}
+    state.lists.forEach(list => {
+      (list.tags || []).forEach(tag => {
+        if (!tagged[tag]) tagged[tag] = []
+        tagged[tag].push(list)
+      })
+    })
+    return tagged
+  },
+  async categorizeList(listId) {
+    const list = state.lists.find(l => l._id === listId)
+    if (!list) return
+
+    state.aiLoading = list._id
+    try {
+      const result = await CustomSync.AI.categorize(list.tabs)
+      if (result.category) {
+        manager.updateListById(list._id, { category: result.category })
+      }
+      if (result.tags) {
+        manager.updateListById(list._id, { tags: result.tags })
+      }
+      return result
+    } catch (error) {
+      console.error('[SquirrlTab] Categorization failed:', error)
+      throw error
+    } finally {
+      state.aiLoading = null
+    }
+  },
+  async restoreList(listId, inNewWindow = false) {
+    const list = state.lists.find(l => l._id === listId)
+    if (!list) {
+      console.warn('[SquirrlTab] Cannot restore list: not found', listId)
+      return false
+    }
+    try {
+      if (inNewWindow) await tabsHelper.restoreListInNewWindow(list)
+      else await tabsHelper.restoreTabs(list.tabs)
+      if (!list.pinned) {
+        await manager.removeListById(listId)
+      }
+      return true
+    } catch (error) {
+      console.error('[SquirrlTab] Failed to restore list:', error)
+      throw error
+    }
+  },
+  updateList(listId, updates) {
+    manager.updateListById(listId, updates)
+  },
+  removeList(listId) {
+    manager.removeListById(listId)
+  },
+  pinList(listId, pinned) {
+    manager.updateListById(listId, { pinned })
+  },
+  changeColor(listId, color) {
+    manager.updateListById(listId, { color })
+  },
+  manualRetry() {
+    const hadPending = Boolean(state.pendingRetry)
+    logSyncEvent('manual_retry', { hadPending })
+    if (state.pendingRetry) {
+      if (retryTimer) {
+        clearTimeout(retryTimer)
+        retryTimer = null
+      }
+      const payload = state.pendingRetry
+      state.pendingRetry = null
+      pushStateToServer(payload)
+      return
+    }
+    const snapshot = $state.snapshot(state.lists)
+    scheduleSync('manual-retry', {
+      immediate: true,
+      listsOverride: snapshot,
+      signatureOverride: buildSignature(snapshot),
+      force: true,
+    })
+  },
+  async cleanAll() {
+    const ids = state.lists.map(l => l._id)
+    for (const id of ids) {
+      manager.removeListById(id)
+    }
+  },
+}
+
+browser.runtime.onMessage.addListener(message => {
+  if (!message || !message.type) return
+  if (message.type === RUNTIME_MESSAGES.STASH_COMPLETED) {
+    syncStore.updateSnackbar('Current tab stashed')
+  }
+  if (message.type === RUNTIME_MESSAGES.STASH_FAILED) {
+    const reason = message.payload?.reason
+    const msg = reason === 'BLOCKED_URL'
+      ? 'Cannot stash the IceTab app itself'
+      : 'Unable to stash current tab'
+    syncStore.updateSnackbar(msg)
+  }
+})
+````
+
+## File: src/background/messageHandler.js
+````javascript
+import tabs from '../common/tabs'
+import storage from '../common/storage'
+// import boss from '../common/service/boss' // Keep import commented if you previously uncommented it for boss.js
+import { sendMessage } from '../common/utils'
+import listManager from '../common/listManager'
+import { setupContextMenus } from './contextMenus'
+import { updateBrowserAction } from './browserAction'
+import { ILLEGAL_URLS, RUNTIME_MESSAGES } from '../common/constants'
+const getExtensionUrlPrefix = () => chrome.runtime.getURL('')
+
+const isBlockedStashTarget = url => {
+  if (!url) return true
+  const extensionUrl = getExtensionUrlPrefix()
+  if (url.startsWith(extensionUrl)) return true
+  return ILLEGAL_URLS.some(prefix => url.startsWith(prefix))
+}
+
+const emitStashEvent = (type, payload) => {
+  return chrome.runtime.sendMessage({
+    type,
+    payload,
+  }).catch(() => {
+    // It's fine if no UI is listening.
+  })
+}
+
+const handleStashCurrentTabIntent = async (source = 'app') => {
+  try {
+    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true })
+    if (!activeTab || !activeTab.id) {
+      throw new Error('NO_ACTIVE_TAB')
+    }
+    if (isBlockedStashTarget(activeTab.url)) {
+      throw new Error('BLOCKED_URL')
+    }
+    await tabs.storeCurrentTab()
+    await emitStashEvent(RUNTIME_MESSAGES.STASH_COMPLETED, {
+      source,
+      tabId: activeTab.id,
+      title: activeTab.title,
+      url: activeTab.url,
+    })
+  } catch (error) {
+    await emitStashEvent(RUNTIME_MESSAGES.STASH_FAILED, {
+      source,
+      reason: error.message || 'UNKNOWN',
+    })
+    console.error('[SquirrlTab] Failed to stash current tab intent:', error)
+  }
+}
+
+const messageHandler = async msg => {
+  if (!msg) return
+
+  if (msg.type === "REQUEST_SAVE_TAB") {
+    await tabs.storeCurrentTab()
+
+    chrome.runtime.sendMessage({
+      type: "LISTS_UPDATED",
+    })
+
+    return
+  }
+
+
+  if (msg.type === RUNTIME_MESSAGES.STASH_COMPLETED || msg.type === RUNTIME_MESSAGES.STASH_FAILED) {
+    return
+  }
+  if (msg.type === RUNTIME_MESSAGES.STASH_CURRENT_TAB) {
+    const source = msg.payload?.source || 'app'
+    handleStashCurrentTabIntent(source)
+    return
+  }
+  console.debug('received', msg)
+  if (msg.optionsChanged) {
+    const changes = msg.optionsChanged
+    console.debug('options changed', changes)
+
+    const latestOpts = await storage.getOptions()
+    Object.assign(latestOpts, changes)
+    await storage.setOptions(latestOpts)
+
+    if (changes.browserAction) updateBrowserAction(changes.browserAction)
+    if (['pageContext', 'allContext', 'disableDynamicMenu'].some(k => k in changes)) {
+      await setupContextMenus(latestOpts)
+    }
+    await sendMessage({ optionsChangeHandledStatus: 'success' })
+  }
+  if (msg.restoreList) {
+    const { restoreList } = msg
+    const listIndex = restoreList.index
+    const lists = await storage.getLists()
+    const list = lists[listIndex]
+    if (restoreList.newWindow) {
+      tabs.restoreListInNewWindow(list)
+    } else {
+      tabs.restoreList(list)
+    }
+    if (!list.pinned) {
+      listManager.removeListById(list._id)
+    }
+  }
+  if (msg.storeInto) {
+    tabs.storeSelectedTabs(msg.storeInto.index)
+  }
+  /*
+  if (msg.login) {
+    boss.login(msg.login.token)
+  }
+  if (msg.refresh) {
+    boss.refresh()
+  }
+  */
+    if (msg.import) {
+    const { lists } = msg.import
+    lists.forEach(list => listManager.addList(list))
+
+    chrome.runtime.sendMessage({
+      type: "LISTS_UPDATED",
+    })
+    return
+  }
+}
+export default messageHandler
 ````
 
 ## File: CHANGELOG.md
@@ -8853,351 +8655,6 @@ export default new Vuex.Store({
 })
 ````
 
-## File: src/background/init.js
-````javascript
-/* eslint-disable */
-import _ from 'lodash'
-import tabs from '../common/tabs'
-import options from '../common/options'
-import storage from '../common/storage'
-import migrate from '../common/migrate'
-import boss from '../common/service/boss' // Keep import as it's commented out in boss.js
-import { normalizeList } from '../common/list'
-import commandHandler from './commandHandler'
-import messageHandler from './messageHandler'
-import listManager from '../common/listManager'
-import { setupContextMenus, dynamicDisableMenu, handleContextMenuClicked } from './contextMenus'
-import installedEventHandler from './installedEventHandler'
-import { updateBrowserAction, getBrowserActionHandler, getCoverBrowserAction } from './browserAction'
-
-
-// Global variables for the service worker context
-let opts_global = {};
-let nightmode_global = false;
-let boss_token_global = null;
-let updateVersion_global = null;
-let drawer_global = false;
-
-const initOptions = async () => {
-  const opts = await storage.getOptions() || {}
-  const defaultOptions = options.getDefaultOptions()
-
-  if (_.keys(defaultOptions).some(key => !_.has(opts, key))) {
-    _.defaults(opts, defaultOptions)
-    await storage.setOptions(opts)
-  }
-
-  nightmode_global = opts.defaultNightMode
-  opts_global = opts;
-  const storedDrawer = await storage.get('drawer');
-  drawer_global = _.defaultTo(storedDrawer, true);
-  return opts
-}
-
-const storageChangedHandler = async changes => {
-  console.debug('[storage changed]', changes)
-  if (changes.boss_token) {
-    boss_token_global = changes.boss_token.newValue
-  }
-  if (changes.opts) {
-    opts_global = changes.opts.newValue || options.getDefaultOptions();
-    nightmode_global = opts_global.defaultNightMode;
-  }
-  if (changes.drawer) {
-    drawer_global = changes.newValue;
-  }
-
-  if (changes.lists) {
-    if (opts_global.disableDynamicMenu) return
-    await setupContextMenus(opts_global)
-  }
-}
-
-const tabsChangedHandler = async activeInfo => {
-  if (opts_global.disableDynamicMenu) return
-  const currentCoverBrowserAction = getCoverBrowserAction();
-  if (currentCoverBrowserAction) {
-    await currentCoverBrowserAction(activeInfo);
-  }
-  dynamicDisableMenu()
-}
-
-const fixDirtyData = async () => {
-  const unlock = await listManager.RWLock.lock()
-  const { lists } = await chrome.storage.local.get('lists')
-  if (lists) {
-    const cleanLists = lists.filter(_.isPlainObject).map(normalizeList)
-    await chrome.storage.local.set({ lists: cleanLists })
-  }
-  await unlock()
-}
-
-const init = async () => {
-  try {
-    // await logger.init() // The logger has been temporarily disabled for debugging
-    await listManager.init()
-    const opts = await initOptions()
-    await setupContextMenus(opts)
-    if (chrome?.contextMenus?.onClicked && !chrome.contextMenus.onClicked.hasListener(handleContextMenuClicked)) {
-      chrome.contextMenus.onClicked.addListener(handleContextMenuClicked)
-    }
-
-    chrome.runtime.onInstalled.addListener(async () => {
-      const opts = await initOptions();
-      await setupContextMenus(opts);
-    });
-  const isServiceWorker =
-    typeof chrome !== "undefined" &&
-    chrome.runtime &&
-    chrome.runtime.id &&
-    !chrome.extension?.getViews?.({ type: "popup" })?.length;
-
-
-  // Around line 99
-  if (typeof chrome.commands !== 'undefined' && chrome.commands.getAll) {
-      chrome.commands.getAll((commands) => {
-          // ... existing internal logic if there was any ...
-      });
-  } else {
-      console.log("Commands API not available, skipping initialization of shortcuts.");
-  }
-    chrome.runtime.onMessageExternal.addListener(commandHandler)
-    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-      if (msg.type === 'getGlobalState') {
-        if (msg.key === 'drawer') {
-          sendResponse({ [msg.key]: drawer_global });
-        } else if (msg.key === 'nightmode') {
-          sendResponse({ [msg.key]: nightmode_global });
-        }
-        return true;
-      }
-
-      if (msg.type === 'setGlobalState') {
-        (async () => {
-          if (msg.key === 'drawer') {
-            drawer_global = msg.value;
-            await storage.set({ drawer: msg.value });
-          } else if (msg.key === 'nightmode') {
-            nightmode_global = msg.value;
-            const currentOpts = await storage.getOptions();
-            currentOpts.defaultNightMode = msg.value;
-            await storage.setOptions(currentOpts);
-          }
-          sendResponse({ success: true });
-        })();
-        return true;
-      }
-
-      messageHandler(msg);
-    });
-    chrome.runtime.onUpdateAvailable.addListener(detail => { updateVersion_global = detail.version })
-    chrome.action.onClicked.addListener(async () => {
-      const handler = getBrowserActionHandler(opts_global.browserAction)
-      if (handler) {
-        await handler()
-      }
-    });
-    chrome.tabs.onActivated.addListener(_.debounce(tabsChangedHandler, 200));
-    chrome.storage.onChanged.addListener(storageChangedHandler);
-
-
-
-    await migrate()
-    await fixDirtyData()
-
-  } catch (error) {
-    console.error("A critical error occurred during background script initialization:", error);
-  }
-}
-
-export default init
-````
-
-## File: src/common/tabs.js
-````javascript
-import storage from './storage'
-import {createNewTabList} from './list'
-import listManager from './listManager'
-import {ILLEGAL_URLS} from './constants'
-
-
-const getAllInWindow = windowId => chrome.tabs.query({windowId})
-
-const APP_TAB_ID_KEY = 'appTabIds' // Define a key for storing app tab IDs in storage
-
-const openTabLists = async () => {
-  const currentWindow = await chrome.windows.getCurrent()
-  const windowId = currentWindow.id
-  const tabListsUrl = chrome.runtime.getURL('index.html#/app/')
-
-  // Retrieve stored appTabIds from local storage
-  const storedData = await chrome.storage.local.get(APP_TAB_ID_KEY)
-  const appTabIds = storedData[APP_TAB_ID_KEY] || {}
-
-  if (windowId in appTabIds) {
-    const tabs = await getAllInWindow(windowId)
-    const tab = tabs.find(t => t.id === appTabIds[windowId])
-    if (tab && tab.url.startsWith(tabListsUrl)) {
-      // If the tab exists and is the correct URL, activate it
-      return chrome.tabs.update(tab.id, { active: true })
-    }
-    // If tab doesn't exist or URL is wrong, remove it from tracking
-    delete appTabIds[windowId]
-    await chrome.storage.local.set({ [APP_TAB_ID_KEY]: appTabIds })
-  }
-
-  // Create a new tab and store its ID
-  const createdTab = await chrome.tabs.create({ url: tabListsUrl })
-  appTabIds[windowId] = createdTab.id
-  await chrome.storage.local.set({ [APP_TAB_ID_KEY]: appTabIds })
-}
-
-const openAboutPage = () => {
-  window.open(chrome.runtime.getURL('index.html#/app/about'))
-}
-
-const getSelectedTabs = () => chrome.tabs.query({highlighted: true, currentWindow: true})
-
-const getAllTabsInCurrentWindow = async () => {
-  const currentWindow = await chrome.windows.getCurrent()
-  return getAllInWindow(currentWindow.id)
-}
-
-const groupTabsInCurrentWindow = async () => {
-  const tabs = await getAllTabsInCurrentWindow()
-  const result = { left: [], right: [], inter: [], all: tabs }
-  let currentIsRight = false
-  for (const tab of tabs) {
-    if (tab.highlighted) {
-      currentIsRight = true
-      result.inter.push(tab)
-    } else if (currentIsRight) result.right.push(tab)
-    else result.left.push(tab)
-  }
-  result.twoSide = result.left.concat(result.right)
-  return result
-}
-
-const isLegalURL = url => ILLEGAL_URLS.every(prefix => !url.startsWith(prefix))
-const storeTabs = async (tabs, listIndex) => {
-  const appUrl = chrome.runtime.getURL('')
-  tabs = tabs.filter(i => !i.url.startsWith(appUrl))
-
-  const opts = await storage.getOptions()
-  if (opts.ignorePinned) tabs = tabs.filter(i => !i.pinned)
-  if (opts.excludeIllegalURL) tabs = tabs.filter(i => isLegalURL(i.url))
-  if (tabs.length === 0) return
-
-  // 🔹 always start from persisted state
-  const lists = await storage.getLists()
-
-  if (listIndex == null) {
-    const newList = createNewTabList({ tabs })
-    if (opts.pinNewList) newList.pinned = true
-    lists.unshift(newList)
-  } else {
-    const list = lists[listIndex]
-    tabs.forEach(tab => list.tabs.push(tab))
-  }
-
-  // 🔴 THIS is the critical line
-  await storage.setLists(lists)
-
-  return chrome.tabs.remove(tabs.map(i => i.id))
-}
-const storeCurrentTab = async listIndex => {
-  const tabs = await chrome.tabs.query({active: true, currentWindow: true})
-  if (!tabs || tabs.length === 0) throw new Error('No active tab to stash')
-  return storeTabs(tabs, listIndex)
-}
-
-const storeLeftTabs = async listIndex => storeTabs((await groupTabsInCurrentWindow()).left, listIndex)
-const storeRightTabs = async listIndex => storeTabs((await groupTabsInCurrentWindow()).right, listIndex)
-const storeTwoSideTabs = async listIndex => storeTabs((await groupTabsInCurrentWindow()).twoSide, listIndex)
-
-const storeSelectedTabs = async listIndex => {
-  const tabs = await getSelectedTabs()
-  const allTabs = await getAllTabsInCurrentWindow()
-  if (tabs.length === allTabs.length) await openTabLists()
-  return storeTabs(tabs, listIndex)
-}
-
-const storeAllTabs = async listIndex => {
-  const tabs = await getAllTabsInCurrentWindow()
-  const opts = await storage.getOptions()
-  if (opts.openTabListNoTab) await openTabLists()
-  return storeTabs(tabs, listIndex)
-}
-
-const storeAllTabInAllWindows = async () => {
-  const windows = await chrome.windows.getAll()
-  const opts = await storage.getOptions()
-  if (opts.openTabListNoTab) await openTabLists()
-  const tasks = []
-  for (const window of windows) {
-    const task = getAllInWindow(window.id).then(storeTabs)
-    tasks.push(task)
-  }
-  return Promise.all(tasks)
-}
-
-const restoreTabs = async (tabs, windowId) => {
-  const opts = await storage.getOptions()
-  let indexOffset = 0
-  if (opts.openEnd) {
-    const tabs = await getAllTabsInCurrentWindow()
-    const {index} = tabs.pop()
-    indexOffset = index + 1
-  }
-  for (let i = 0; i < tabs.length; i += 1) {
-    const tab = tabs[i]
-    const createdTab = await chrome.tabs.create({
-      url: tab.url,
-      pinned: tab.pinned,
-      index: i + indexOffset,
-      windowId,
-    })
-    if (tab.muted) chrome.tabs.update(createdTab.id, {muted: true})
-  }
-}
-
-const restoreList = (list, windowId) => restoreTabs(list.tabs, windowId)
-
-const restoreListInNewWindow = async list => {
-  const createdWindow = await chrome.windows.create({url: list.tabs.map(i => i.url)})
-  list.tabs.forEach((tab, index) => {
-    if (tab.muted) chrome.tabs.update(createdWindow.tabs[index].id, {muted: true})
-  })
-}
-
-const restoreLastestList = async () => {
-  const lists = await storage.getLists()
-  if (lists.length === 0) return true
-  const [lastest] = lists
-  await restoreList(lastest)
-  if (lastest.pinned) return true
-  return listManager.removeListById(lastest._id)
-}
-
-export default {
-  getSelectedTabs,
-  groupTabsInCurrentWindow,
-  storeLeftTabs,
-  storeRightTabs,
-  storeSelectedTabs,
-  storeTwoSideTabs,
-  storeAllTabs,
-  storeAllTabInAllWindows,
-  storeCurrentTab,
-  restoreTabs,
-  restoreList,
-  restoreListInNewWindow,
-  restoreLastestList,
-  openTabLists,
-  openAboutPage,
-}
-````
-
 ## File: src/common/service/boss.js
 ````javascript
 // import {
@@ -9479,6 +8936,351 @@ export default {
 //   init,
 //   refresh,
 // }
+````
+
+## File: src/common/tabs.js
+````javascript
+import storage from './storage'
+import {createNewTabList} from './list'
+import listManager from './listManager'
+import {ILLEGAL_URLS} from './constants'
+
+
+const getAllInWindow = windowId => chrome.tabs.query({windowId})
+
+const APP_TAB_ID_KEY = 'appTabIds' // Define a key for storing app tab IDs in storage
+
+const openlists = async () => {
+  const currentWindow = await chrome.windows.getCurrent()
+  const windowId = currentWindow.id
+  const listsUrl = chrome.runtime.getURL('index.html#/app/')
+
+  // Retrieve stored appTabIds from local storage
+  const storedData = await chrome.storage.local.get(APP_TAB_ID_KEY)
+  const appTabIds = storedData[APP_TAB_ID_KEY] || {}
+
+  if (windowId in appTabIds) {
+    const tabs = await getAllInWindow(windowId)
+    const tab = tabs.find(t => t.id === appTabIds[windowId])
+    if (tab && tab.url.startsWith(listsUrl)) {
+      // If the tab exists and is the correct URL, activate it
+      return chrome.tabs.update(tab.id, { active: true })
+    }
+    // If tab doesn't exist or URL is wrong, remove it from tracking
+    delete appTabIds[windowId]
+    await chrome.storage.local.set({ [APP_TAB_ID_KEY]: appTabIds })
+  }
+
+  // Create a new tab and store its ID
+  const createdTab = await chrome.tabs.create({ url: listsUrl })
+  appTabIds[windowId] = createdTab.id
+  await chrome.storage.local.set({ [APP_TAB_ID_KEY]: appTabIds })
+}
+
+const openAboutPage = () => {
+  window.open(chrome.runtime.getURL('index.html#/app/about'))
+}
+
+const getSelectedTabs = () => chrome.tabs.query({highlighted: true, currentWindow: true})
+
+const getAllTabsInCurrentWindow = async () => {
+  const currentWindow = await chrome.windows.getCurrent()
+  return getAllInWindow(currentWindow.id)
+}
+
+const groupTabsInCurrentWindow = async () => {
+  const tabs = await getAllTabsInCurrentWindow()
+  const result = { left: [], right: [], inter: [], all: tabs }
+  let currentIsRight = false
+  for (const tab of tabs) {
+    if (tab.highlighted) {
+      currentIsRight = true
+      result.inter.push(tab)
+    } else if (currentIsRight) result.right.push(tab)
+    else result.left.push(tab)
+  }
+  result.twoSide = result.left.concat(result.right)
+  return result
+}
+
+const isLegalURL = url => ILLEGAL_URLS.every(prefix => !url.startsWith(prefix))
+const storeTabs = async (tabs, listIndex) => {
+  const appUrl = chrome.runtime.getURL('')
+  tabs = tabs.filter(i => !i.url.startsWith(appUrl))
+
+  const opts = await storage.getOptions()
+  if (opts.ignorePinned) tabs = tabs.filter(i => !i.pinned)
+  if (opts.excludeIllegalURL) tabs = tabs.filter(i => isLegalURL(i.url))
+  if (tabs.length === 0) return
+
+  // 🔹 always start from persisted state
+  const lists = await storage.getLists()
+
+  if (listIndex == null) {
+    const newList = createNewTabList({ tabs })
+    if (opts.pinNewList) newList.pinned = true
+    lists.unshift(newList)
+  } else {
+    const list = lists[listIndex]
+    tabs.forEach(tab => list.tabs.push(tab))
+  }
+
+  // 🔴 THIS is the critical line
+  await storage.setLists(lists)
+
+  return chrome.tabs.remove(tabs.map(i => i.id))
+}
+const storeCurrentTab = async listIndex => {
+  const tabs = await chrome.tabs.query({active: true, currentWindow: true})
+  if (!tabs || tabs.length === 0) throw new Error('No active tab to stash')
+  return storeTabs(tabs, listIndex)
+}
+
+const storeLeftTabs = async listIndex => storeTabs((await groupTabsInCurrentWindow()).left, listIndex)
+const storeRightTabs = async listIndex => storeTabs((await groupTabsInCurrentWindow()).right, listIndex)
+const storeTwoSideTabs = async listIndex => storeTabs((await groupTabsInCurrentWindow()).twoSide, listIndex)
+
+const storeSelectedTabs = async listIndex => {
+  const tabs = await getSelectedTabs()
+  const allTabs = await getAllTabsInCurrentWindow()
+  if (tabs.length === allTabs.length) await openlists()
+  return storeTabs(tabs, listIndex)
+}
+
+const storeAllTabs = async listIndex => {
+  const tabs = await getAllTabsInCurrentWindow()
+  const opts = await storage.getOptions()
+  if (opts.openTabListNoTab) await openlists()
+  return storeTabs(tabs, listIndex)
+}
+
+const storeAllTabInAllWindows = async () => {
+  const windows = await chrome.windows.getAll()
+  const opts = await storage.getOptions()
+  if (opts.openTabListNoTab) await openlists()
+  const tasks = []
+  for (const window of windows) {
+    const task = getAllInWindow(window.id).then(storeTabs)
+    tasks.push(task)
+  }
+  return Promise.all(tasks)
+}
+
+const restoreTabs = async (tabs, windowId) => {
+  const opts = await storage.getOptions()
+  let indexOffset = 0
+  if (opts.openEnd) {
+    const tabs = await getAllTabsInCurrentWindow()
+    const {index} = tabs.pop()
+    indexOffset = index + 1
+  }
+  for (let i = 0; i < tabs.length; i += 1) {
+    const tab = tabs[i]
+    const createdTab = await chrome.tabs.create({
+      url: tab.url,
+      pinned: tab.pinned,
+      index: i + indexOffset,
+      windowId,
+    })
+    if (tab.muted) chrome.tabs.update(createdTab.id, {muted: true})
+  }
+}
+
+const restoreList = (list, windowId) => restoreTabs(list.tabs, windowId)
+
+const restoreListInNewWindow = async list => {
+  const createdWindow = await chrome.windows.create({url: list.tabs.map(i => i.url)})
+  list.tabs.forEach((tab, index) => {
+    if (tab.muted) chrome.tabs.update(createdWindow.tabs[index].id, {muted: true})
+  })
+}
+
+const restoreLastestList = async () => {
+  const lists = await storage.getLists()
+  if (lists.length === 0) return true
+  const [lastest] = lists
+  await restoreList(lastest)
+  if (lastest.pinned) return true
+  return listManager.removeListById(lastest._id)
+}
+
+export default {
+  getSelectedTabs,
+  groupTabsInCurrentWindow,
+  storeLeftTabs,
+  storeRightTabs,
+  storeSelectedTabs,
+  storeTwoSideTabs,
+  storeAllTabs,
+  storeAllTabInAllWindows,
+  storeCurrentTab,
+  restoreTabs,
+  restoreList,
+  restoreListInNewWindow,
+  restoreLastestList,
+  openlists,
+  openAboutPage,
+}
+````
+
+## File: src/background/init.js
+````javascript
+/* eslint-disable */
+import _ from 'lodash'
+import tabs from '../common/tabs'
+import options from '../common/options'
+import storage from '../common/storage'
+import migrate from '../common/migrate'
+import boss from '../common/service/boss' // Keep import as it's commented out in boss.js
+import { normalizeList } from '../common/list'
+import commandHandler from './commandHandler'
+import messageHandler from './messageHandler'
+import listManager from '../common/listManager'
+import { setupContextMenus, dynamicDisableMenu, handleContextMenuClicked } from './contextMenus'
+import installedEventHandler from './installedEventHandler'
+import { updateBrowserAction, getBrowserActionHandler, getCoverBrowserAction } from './browserAction'
+
+
+// Global variables for the service worker context
+let opts_global = {};
+let nightmode_global = false;
+let boss_token_global = null;
+let updateVersion_global = null;
+let drawer_global = false;
+
+const initOptions = async () => {
+  const opts = await storage.getOptions() || {}
+  const defaultOptions = options.getDefaultOptions()
+
+  if (_.keys(defaultOptions).some(key => !_.has(opts, key))) {
+    _.defaults(opts, defaultOptions)
+    await storage.setOptions(opts)
+  }
+
+  nightmode_global = opts.defaultNightMode
+  opts_global = opts;
+  const storedDrawer = await storage.get('drawer');
+  drawer_global = _.defaultTo(storedDrawer, true);
+  return opts
+}
+
+const storageChangedHandler = async changes => {
+  console.debug('[storage changed]', changes)
+  if (changes.boss_token) {
+    boss_token_global = changes.boss_token.newValue
+  }
+  if (changes.opts) {
+    opts_global = changes.opts.newValue || options.getDefaultOptions();
+    nightmode_global = opts_global.defaultNightMode;
+  }
+  if (changes.drawer) {
+    drawer_global = changes.newValue;
+  }
+
+  if (changes.lists) {
+    if (opts_global.disableDynamicMenu) return
+    await setupContextMenus(opts_global)
+  }
+}
+
+const tabsChangedHandler = async activeInfo => {
+  if (opts_global.disableDynamicMenu) return
+  const currentCoverBrowserAction = getCoverBrowserAction();
+  if (currentCoverBrowserAction) {
+    await currentCoverBrowserAction(activeInfo);
+  }
+  dynamicDisableMenu()
+}
+
+const fixDirtyData = async () => {
+  const unlock = await listManager.RWLock.lock()
+  const { lists } = await chrome.storage.local.get('lists')
+  if (lists) {
+    const cleanLists = lists.filter(_.isPlainObject).map(normalizeList)
+    await chrome.storage.local.set({ lists: cleanLists })
+  }
+  await unlock()
+}
+
+const init = async () => {
+  try {
+    // await logger.init() // The logger has been temporarily disabled for debugging
+    await listManager.init()
+    const opts = await initOptions()
+    await setupContextMenus(opts)
+    if (chrome?.contextMenus?.onClicked && !chrome.contextMenus.onClicked.hasListener(handleContextMenuClicked)) {
+      chrome.contextMenus.onClicked.addListener(handleContextMenuClicked)
+    }
+
+    chrome.runtime.onInstalled.addListener(async () => {
+      const opts = await initOptions();
+      await setupContextMenus(opts);
+    });
+  const isServiceWorker =
+    typeof chrome !== "undefined" &&
+    chrome.runtime &&
+    chrome.runtime.id &&
+    !chrome.extension?.getViews?.({ type: "popup" })?.length;
+
+
+  // Around line 99
+  if (typeof chrome.commands !== 'undefined' && chrome.commands.getAll) {
+      chrome.commands.getAll((commands) => {
+          // ... existing internal logic if there was any ...
+      });
+  } else {
+      console.log("Commands API not available, skipping initialization of shortcuts.");
+  }
+    chrome.runtime.onMessageExternal.addListener(commandHandler)
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (msg.type === 'getGlobalState') {
+        if (msg.key === 'drawer') {
+          sendResponse({ [msg.key]: drawer_global });
+        } else if (msg.key === 'nightmode') {
+          sendResponse({ [msg.key]: nightmode_global });
+        }
+        return true;
+      }
+
+      if (msg.type === 'setGlobalState') {
+        (async () => {
+          if (msg.key === 'drawer') {
+            drawer_global = msg.value;
+            await storage.set({ drawer: msg.value });
+          } else if (msg.key === 'nightmode') {
+            nightmode_global = msg.value;
+            const currentOpts = await storage.getOptions();
+            currentOpts.defaultNightMode = msg.value;
+            await storage.setOptions(currentOpts);
+          }
+          sendResponse({ success: true });
+        })();
+        return true;
+      }
+
+      messageHandler(msg);
+    });
+    chrome.runtime.onUpdateAvailable.addListener(detail => { updateVersion_global = detail.version })
+    chrome.action.onClicked.addListener(async () => {
+      const handler = getBrowserActionHandler(opts_global.browserAction)
+      if (handler) {
+        await handler()
+      }
+    });
+    chrome.tabs.onActivated.addListener(_.debounce(tabsChangedHandler, 200));
+    chrome.storage.onChanged.addListener(storageChangedHandler);
+
+
+
+    await migrate()
+    await fixDirtyData()
+
+  } catch (error) {
+    console.error("A critical error occurred during background script initialization:", error);
+  }
+}
+
+export default init
 ````
 
 ## File: README.md

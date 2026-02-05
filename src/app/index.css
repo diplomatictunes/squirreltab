@@ -448,3 +448,60 @@ img {
   color: var(--text-secondary);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
+
+.ai-tag-suggestions {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed rgba(255, 146, 43, 0.3);
+  background: rgba(255, 146, 43, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-tag-suggestions.compact {
+  padding: 6px 8px;
+}
+
+.ai-tag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-tag-chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-sm);
+  gap: 8px;
+}
+
+.ai-tag-chip .tag-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ai-tag-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.ai-tag-btn {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 3px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--brand-primary);
+  color: #141517;
+}
+
+.ai-tag-btn.ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}

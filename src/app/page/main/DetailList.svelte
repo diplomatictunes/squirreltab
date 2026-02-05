@@ -249,6 +249,18 @@
     await syncStore.rejectAiSuggestion(list._id);
   }
 
+  async function acceptSuggestedTag(list, tag, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.acceptSuggestedTag(list._id, tag);
+  }
+
+  async function rejectSuggestedTag(list, tag, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.rejectSuggestedTag(list._id, tag);
+  }
+
   // Popup UI dispatches stash intent only; background performs all tab and storage work.
   function stashCurrentTabFromEmpty() {
     if (!popupContext || emptyStashLoading) return;
@@ -471,6 +483,41 @@
                     >
                       Dismiss
                     </button>
+                  </div>
+                </div>
+              {/if}
+              {#if list.aiSuggestedTags && list.aiSuggestedTags.length}
+                <div
+                  class="ai-tag-suggestions"
+                  onclick={(event) => event.stopPropagation()}
+                >
+                  <div class="ai-suggestion-body">
+                    <span class="ai-chip">Suggested tags</span>
+                  </div>
+                  <div class="ai-tag-list">
+                    {#each list.aiSuggestedTags as tag}
+                      <div class="ai-tag-chip">
+                        <span class="tag-label">#{tag}</span>
+                        <div class="ai-tag-actions">
+                          <button
+                            class="ai-tag-btn"
+                            type="button"
+                            onclick={(event) => acceptSuggestedTag(list, tag, event)}
+                            aria-label={`Accept tag ${tag}`}
+                          >
+                            Add
+                          </button>
+                          <button
+                            class="ai-tag-btn ghost"
+                            type="button"
+                            onclick={(event) => rejectSuggestedTag(list, tag, event)}
+                            aria-label={`Dismiss tag ${tag}`}
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    {/each}
                   </div>
                 </div>
               {/if}

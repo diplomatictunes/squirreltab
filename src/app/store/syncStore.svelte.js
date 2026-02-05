@@ -167,6 +167,18 @@ const waitForNextTick = () => new Promise(resolve => {
   else setTimeout(resolve, 0)
 })
 
+const normalizeTagValue = tag => {
+  if (typeof tag !== 'string') return ''
+  const trimmed = tag.trim()
+  if (!trimmed) return ''
+  return trimmed.length > 120 ? trimmed.slice(0, 120) : trimmed
+}
+
+const removeSuggestedTag = (list, tagValue) => {
+  if (!list || !Array.isArray(list.aiSuggestedTags)) return []
+  return list.aiSuggestedTags.filter(tag => tag !== tagValue)
+}
+
 // MV3 popups cold-start before background writes settle. A post-listener re-read
 // keeps initialized=false until we confirm storage reflects the latest lists.
 const confirmLocalListsHydrated = async baselineSignature => {
@@ -593,6 +605,39 @@ export const syncStore = {
     } catch (error) {
       console.error('[SquirrlTab] Failed to reject AI suggestion:', error)
       state.snackbar = { status: true, msg: 'Unable to dismiss suggestion', type: 'error' }
+      return false
+    }
+  },
+  async acceptSuggestedTag(listId, tagValue) {
+    const normalizedTag = normalizeTagValue(tagValue)
+    if (!normalizedTag) return false
+    const list = state.lists.find(l => l._id === listId)
+    if (!list) return false
+    try {
+      const existing = Array.isArray(list.tags) ? list.tags : []
+      const merged = Array.from(new Set([...existing, normalizedTag]))
+      const remainingSuggestions = removeSuggestedTag(list, normalizedTag)
+      await manager.updateListById(listId, { tags: merged, aiSuggestedTags: remainingSuggestions })
+      state.snackbar = { status: true, msg: `Tag "${normalizedTag}" added`, type: 'success' }
+      return true
+    } catch (error) {
+      console.error('[SquirrlTab] Failed to accept tag suggestion:', error)
+      state.snackbar = { status: true, msg: 'Unable to add suggested tag', type: 'error' }
+      return false
+    }
+  },
+  async rejectSuggestedTag(listId, tagValue) {
+    const normalizedTag = normalizeTagValue(tagValue)
+    if (!normalizedTag) return false
+    const list = state.lists.find(l => l._id === listId)
+    if (!list?.aiSuggestedTags?.length) return false
+    try {
+      const remaining = removeSuggestedTag(list, normalizedTag)
+      await manager.updateListById(listId, { aiSuggestedTags: remaining })
+      return true
+    } catch (error) {
+      console.error('[SquirrlTab] Failed to reject tag suggestion:', error)
+      state.snackbar = { status: true, msg: 'Unable to dismiss tag suggestion', type: 'error' }
       return false
     }
   },

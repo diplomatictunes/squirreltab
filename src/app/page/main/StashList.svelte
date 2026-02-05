@@ -89,6 +89,18 @@
     if (!list) return;
     await syncStore.rejectAiSuggestion(list._id);
   }
+
+  async function acceptSuggestedTag(list, tag, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.acceptSuggestedTag(list._id, tag);
+  }
+
+  async function rejectSuggestedTag(list, tag, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.rejectSuggestedTag(list._id, tag);
+  }
 </script>
 
 <div class="stash-layout">
@@ -190,6 +202,37 @@
                   >
                     Dismiss
                   </button>
+                </div>
+              </div>
+            {/if}
+            {#if list.aiSuggestedTags && list.aiSuggestedTags.length}
+              <div
+                class="ai-tag-suggestions compact"
+                onclick={(event) => event.stopPropagation()}
+              >
+                <span class="ai-chip">Suggested tags</span>
+                <div class="ai-tag-list">
+                  {#each list.aiSuggestedTags as tag}
+                    <div class="ai-tag-chip">
+                      <span class="tag-label">#{tag}</span>
+                      <div class="ai-tag-actions">
+                        <button
+                          class="ai-tag-btn"
+                          type="button"
+                          onclick={(event) => acceptSuggestedTag(list, tag, event)}
+                        >
+                          Add
+                        </button>
+                        <button
+                          class="ai-tag-btn ghost"
+                          type="button"
+                          onclick={(event) => rejectSuggestedTag(list, tag, event)}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  {/each}
                 </div>
               </div>
             {/if}

@@ -39,6 +39,7 @@ export const createNewTabList = ({ _id, tabs, title, tags, category, time, pinne
     color: color || '',
     updatedAt: updatedAt || resolvedTime,
     aiSuggestedTitle: '',
+    aiSuggestedTags: [],
   }
 }
 

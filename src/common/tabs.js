@@ -76,6 +76,19 @@ const normalizeSuggestedTitle = payload => {
   return candidate.trim()
 }
 
+const normalizeSuggestedTags = payload => {
+  const raw = Array.isArray(payload?.tags)
+    ? payload.tags
+    : Array.isArray(payload?.tagSuggestions)
+      ? payload.tagSuggestions
+      : []
+  const cleaned = raw
+    .map(tag => (typeof tag === 'string' ? tag.trim() : ''))
+    .filter(Boolean)
+  if (cleaned.length === 0) return []
+  return Array.from(new Set(cleaned))
+}
+
 const withTimeout = (promise, timeoutMs) => new Promise((resolve, reject) => {
   const timer = setTimeout(() => reject(new Error('AI_SUGGEST_TIMEOUT')), timeoutMs)
   promise.then(resolve, reject).finally(() => clearTimeout(timer))
@@ -91,9 +104,15 @@ const triggerAiNameSuggestion = (list, opts) => {
     try {
       const response = await withTimeout(CustomSync.AI.suggestName(list.tabs), AI_NAME_TIMEOUT_MS)
       const suggestion = normalizeSuggestedTitle(response)
-      if (suggestion) {
-        await listManager.updateListById(list._id, { aiSuggestedTitle: suggestion })
+      if (!suggestion) {
+        return
       }
+      const tags = normalizeSuggestedTags(response)
+      const updates = { aiSuggestedTitle: suggestion }
+      if (tags.length) {
+        updates.aiSuggestedTags = tags
+      }
+      await listManager.updateListById(list._id, updates)
     } catch (error) {
       if (error?.message !== 'AI_SUGGEST_TIMEOUT') {
         console.warn('[SquirrlTab] Failed to fetch AI name suggestion', error)

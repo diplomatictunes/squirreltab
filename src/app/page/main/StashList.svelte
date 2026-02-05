@@ -2,6 +2,7 @@
   import { syncStore } from "../../store/syncStore.svelte.js";
   import { fade, slide } from "svelte/transition";
   import browser from "webextension-polyfill";
+  import SyncStatusBadge from "../../component/sync/SyncStatusBadge.svelte";
 
   // -- LOGIC / STATE (Assumed existing handlers) --
   // We mecessary logic from DetailList to make this functional
@@ -85,6 +86,9 @@
         bind:value={filterQuery}
         class="search-input"
       />
+    </div>
+    <div class="sync-status">
+      <SyncStatusBadge />
     </div>
   </header>
 
@@ -215,7 +219,9 @@
   .header {
     padding: 32px 32px 16px;
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
     flex-shrink: 0;
   }
 

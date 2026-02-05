@@ -35,7 +35,7 @@ module.exports = {
   entry: {
     app: './src/app/index.js',
     background: './src/background/index.js',
-    gdrive_sandbox: './src/gdrive_sandbox.js',
+    // gdrive_sandbox: './src/gdrive_sandbox.js',
   },
   output: {
     filename: '[name].js',
@@ -64,7 +64,7 @@ module.exports = {
         },
         { from: 'src/assets', to: 'assets' },
         { from: 'src/_locales', to: '_locales' },
-        { from: 'src/gdrive_sandbox.html', to: 'gdrive_sandbox.html' },
+        // { from: 'src/gdrive_sandbox.html', to: 'gdrive_sandbox.html' },
       ],
     }),
 

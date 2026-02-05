@@ -4,10 +4,9 @@
   import { sendStashCurrentTabIntent } from "@/common/intents";
   import { getRuntimeSource } from "@/common/runtimeContext";
 
-  let syncStatus = $state(
-    "✓ Synced · " +
-      new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-  );
+  import SyncStatusBadge from "../../component/sync/SyncStatusBadge.svelte";
+  import Snackbar from "../../component/main/Snackbar.svelte";
+
   let isStashing = $state(false);
 
   // In a real app, this would react to actual sync state
@@ -18,10 +17,11 @@
     try {
       // Use intent if preferred for current tab (as in DetailList)
       await sendStashCurrentTabIntent(getRuntimeSource());
-      window.close(); // Close popup after action
+      // window.close() is removed here as it might prevent seeing the success state,
+      // but usually users want it to close. If it fails, they'll see the error in snackbar.
+      setTimeout(() => window.close(), 1000);
     } catch (e) {
       console.error(e);
-      syncStatus = "! Error stashing";
     } finally {
       isStashing = false;
     }
@@ -63,7 +63,7 @@
 <div class="popup">
   <!-- Status Header -->
   <header class="status-bar">
-    <span class="status-text">{syncStatus}</span>
+    <SyncStatusBadge />
   </header>
 
   <!-- Main Action -->
@@ -100,11 +100,12 @@
     </div>
   </div>
 
-  <!-- Footer Navigation -->
   <footer class="nav-footer">
     <button class="nav-link" onclick={openStashList}>Open stash list</button>
     <button class="nav-link" onclick={openSettings}>Settings</button>
   </footer>
+
+  <Snackbar />
 </div>
 
 <style>

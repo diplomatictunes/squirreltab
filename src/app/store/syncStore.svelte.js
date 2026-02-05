@@ -66,7 +66,7 @@ let state = $state({
   opts: {},
   aiLoading: null,
   syncing: false,
-  snackbar: { status: false, msg: '' },
+  snackbar: { status: false, msg: '', type: 'info' }, // Added type
   initialized: false,
   lastSyncSuccess: null,
   syncPhase: SYNC_PHASES.NEVER_SYNCED,
@@ -140,15 +140,12 @@ const pushStateToServer = async payload => {
   try {
     const response = await CustomSync.syncState(payload.lists)
     const remoteVersion = parseRemoteVersion(response?.updated_at) || computeVersion(payload.lists)
-    state.lastSyncedSignature = payload.signature
-    state.remoteVersion = remoteVersion
-    state.lastSyncedAt = Date.now()
-    state.lastSyncSuccess = true
     state.syncPhase = SYNC_PHASES.SYNCED
     state.syncError = null
     state.localOnly = false
     state.pendingRetry = null
     pendingPayload = null
+    browser.storage.local.set({ lastSyncedSignature: payload.signature }) // Persist signature
     logSyncEvent('push_success', {
       listCount: payload.lists?.length || 0,
       signature: payload.signature,
@@ -167,6 +164,7 @@ const pushStateToServer = async payload => {
     state.localOnly = true
     state.pendingRetry = payload
     scheduleRetry()
+    state.snackbar = { status: true, msg: normalized.message, type: 'error' } // Notify error
     logSyncEvent('push_failed', {
       code: normalized.code,
       phase: normalized.phase,
@@ -234,13 +232,12 @@ const hydrateFromRemote = async () => {
       state.lastSyncedSignature = signature
       state.remoteVersion = remoteVersion
       state.lastSyncSuccess = true
-      state.localOnly = false
-      state.syncError = null
       await storage.setLists(normalizedRemote)
       console.log('[hydrate] setting lists:', normalizedRemote.length)
       state.lists = normalizedRemote
       state.lastSyncedAt = Date.now()
       state.syncPhase = SYNC_PHASES.SYNCED
+      browser.storage.local.set({ lastSyncedSignature: signature }) // Persist signature
       logSyncEvent('hydrate_success', {
         action: 'downloaded',
         remoteLists: normalizedRemote.length,
@@ -276,15 +273,16 @@ const hydrateFromRemote = async () => {
     state.syncError = normalized
     state.lastSyncSuccess = false
     state.localOnly = true
-    
+
     // FORCE LOCAL DATA TO PERSIST
     // This prevents the UI from clearing or hiding the lists 
     // just because the server at localhost:8000 is down.
     if (state.lists.length === 0) {
-       const data = await browser.storage.local.get('lists');
-       state.lists = Array.isArray(data.lists) ? data.lists : [];
+      const data = await browser.storage.local.get('lists');
+      state.lists = Array.isArray(data.lists) ? data.lists : [];
     }
 
+    state.snackbar = { status: true, msg: normalized.message, type: 'error' } // Notify error
     logSyncEvent('hydrate_failed', {
       code: normalized.code,
       phase: normalized.phase,
@@ -294,7 +292,7 @@ const hydrateFromRemote = async () => {
   } finally {
     state.syncing = false
     // Ensure initialized is true so the UI knows it's okay to render
-    state.initialized = true 
+    state.initialized = true
   }
 }
 
@@ -302,16 +300,26 @@ const initStore = async (retries = 3) => {
   let shouldFinalize = true
   let baselineSignature = ''
   try {
-    const data = await browser.storage.local.get(['lists', 'opts'])
+    const data = await browser.storage.local.get(['lists', 'opts', 'lastSyncedSignature'])
     state.lists = Array.isArray(data.lists) ? data.lists : []
     state.opts = data.opts || {}
-    state.lastSyncedSignature = buildSignature(state.lists)
-    baselineSignature = state.lastSyncedSignature
+    state.lastSyncedSignature = data.lastSyncedSignature || '' // Load persisted signature
+    baselineSignature = buildSignature(state.lists)
     state.remoteVersion = computeVersion(state.lists)
     state.lastSyncSuccess = null
     state.localOnly = false
     state.syncError = null
-    state.syncPhase = isAutoSyncEnabled(state.opts) ? SYNC_PHASES.IDLE : SYNC_PHASES.NEVER_SYNCED
+
+    if (isAutoSyncEnabled(state.opts)) {
+      if (state.lastSyncedSignature === baselineSignature) {
+        state.syncPhase = SYNC_PHASES.SYNCED
+      } else {
+        state.syncPhase = SYNC_PHASES.LOCAL_ONLY
+        state.localOnly = true
+      }
+    } else {
+      state.syncPhase = SYNC_PHASES.NEVER_SYNCED
+    }
   } catch (error) {
     console.error('[SquirrlTab] Failed to initialize store:', error)
     if (retries > 0) {
@@ -366,7 +374,7 @@ $effect.root(() => {
     scheduleSync('change', { listsOverride: snapshot, signatureOverride: signature })
   })
 })
-  
+
 
 export const syncStore = {
   get lists() {
@@ -401,11 +409,11 @@ export const syncStore = {
       lastSyncSuccess: state.lastSyncSuccess,
     }
   },
-  updateSnackbar(payload) {
+  updateSnackbar(payload, type = 'info') {
     if (typeof payload === 'string') {
-      state.snackbar = { status: true, msg: payload }
+      state.snackbar = { status: true, msg: payload, type }
     } else {
-      state.snackbar = payload
+      state.snackbar = { ...payload, type: payload.type || 'info' }
     }
   },
   get pinnedLists() {
@@ -504,13 +512,13 @@ export const syncStore = {
 browser.runtime.onMessage.addListener(message => {
   if (!message || !message.type) return
   if (message.type === RUNTIME_MESSAGES.STASH_COMPLETED) {
-    syncStore.updateSnackbar('Current tab stashed')
+    syncStore.updateSnackbar('Current tab stashed', 'success')
   }
   if (message.type === RUNTIME_MESSAGES.STASH_FAILED) {
     const reason = message.payload?.reason
     const msg = reason === 'BLOCKED_URL'
       ? 'Cannot stash the SquirrlTab app itself'
       : 'Unable to stash current tab'
-    syncStore.updateSnackbar(msg)
+    syncStore.updateSnackbar(msg, 'error')
   }
 })

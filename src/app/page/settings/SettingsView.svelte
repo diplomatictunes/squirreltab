@@ -26,6 +26,7 @@
     syncApiKey: "",
     autoSyncEnabled: false,
     autoSyncInterval: 300, // seconds
+    aiNameSuggestions: false,
     aiExcludedDomainsInput: "",
   });
   
@@ -59,6 +60,7 @@
     settings.syncApiKey = storedOpts.syncApiKey || "";
     settings.autoSyncEnabled = storedOpts.autoSyncEnabled ?? false;
     settings.autoSyncInterval = storedOpts.autoSyncInterval || 300;
+    settings.aiNameSuggestions = storedOpts.aiNameSuggestions ?? false;
     settings.aiExcludedDomainsInput = stringifyExcludedDomains(
       storedOpts.aiExcludedDomains || [],
     );
@@ -75,6 +77,7 @@
         syncApiKey: settings.syncApiKey.trim(),
         autoSyncEnabled: settings.autoSyncEnabled,
         autoSyncInterval: settings.autoSyncInterval,
+        aiNameSuggestions: settings.aiNameSuggestions,
         aiExcludedDomains: parseExcludedDomainsInput(settings.aiExcludedDomainsInput),
       };
       
@@ -139,6 +142,7 @@
     settings.syncApiKey = "";
     settings.autoSyncEnabled = false;
     settings.autoSyncInterval = 300;
+    settings.aiNameSuggestions = false;
     settings.aiExcludedDomainsInput = "";
   }
 </script>
@@ -241,6 +245,20 @@
       <div class="section-header">
         <i class="fas fa-user-shield section-icon"></i>
         <h2>AI Privacy</h2>
+      </div>
+
+      <div class="setting-group">
+        <label class="setting-checkbox">
+          <input
+            id="ai-name-suggestions"
+            type="checkbox"
+            bind:checked={settings.aiNameSuggestions}
+          />
+          <span>Enable AI naming suggestions</span>
+          <span class="checkbox-hint">
+            AI-generated list names are optional and only run when enabled.
+          </span>
+        </label>
       </div>
 
       <div class="setting-group">

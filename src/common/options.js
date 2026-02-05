@@ -234,6 +234,13 @@ export const getOptionsList = () => [
   },
   {
     cate: cate.BEHAVIOUR,
+    name: 'aiNameSuggestions',
+    type: Boolean,
+    default: false,
+    new: '1.5.0',
+  },
+  {
+    cate: cate.BEHAVIOUR,
     name: 'aiExcludedDomains',
     type: Array,
     default: [],

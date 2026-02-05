@@ -66,7 +66,7 @@ const groupTabsInCurrentWindow = async () => {
 
 const AI_NAME_TIMEOUT_MS = 8000
 const aiSuggestionInflight = new Set()
-const isAiNamingEnabled = opts => opts?.aiNameSuggestions !== false
+const isAiNamingEnabled = opts => opts?.aiNameSuggestions === true
 const isLegalURL = url => ILLEGAL_URLS.every(prefix => !url.startsWith(prefix))
 const stashMutex = new Mutex() // serialize stash flows so concurrent triggers cannot interleave
 

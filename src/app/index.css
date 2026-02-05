@@ -358,3 +358,27 @@ img {
     --border-default: #5c5f66;
   }
 }
+
+/* Duplicate indicator badge */
+.duplicate-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 146, 43, 0.4);
+  background: rgba(255, 146, 43, 0.12);
+  color: #ffd8a8;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.duplicate-indicator .duplicate-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--warning);
+  display: inline-block;
+}

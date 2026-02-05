@@ -76,7 +76,46 @@ let state = $state({
   lastSyncedSignature: '',
   remoteVersion: 0,
   pendingRetry: null,
+  duplicateIndex: {},
 })
+
+const EMPTY_DUPLICATE_META = Object.freeze({ hasDuplicates: false, count: 0 })
+
+const buildDuplicateIndex = lists => {
+  if (!Array.isArray(lists) || lists.length === 0) return {}
+  const urlOwners = new Map()
+  lists.forEach(list => {
+    if (!list || !Array.isArray(list.tabs)) return
+    const seenUrls = new Set()
+    list.tabs.forEach(tab => {
+      const url = tab?.url
+      if (!url || seenUrls.has(url)) return
+      seenUrls.add(url)
+      if (!urlOwners.has(url)) urlOwners.set(url, new Set())
+      urlOwners.get(url).add(list._id)
+    })
+  })
+  const duplicateIndex = {}
+  lists.forEach(list => {
+    if (!list || !Array.isArray(list.tabs)) return
+    let count = 0
+    const countedUrls = new Set()
+    list.tabs.forEach(tab => {
+      const url = tab?.url
+      if (!url || countedUrls.has(url)) return
+      countedUrls.add(url)
+      const owners = urlOwners.get(url)
+      if (owners && owners.size > 1) {
+        count += 1
+      }
+    })
+    duplicateIndex[list._id] = {
+      hasDuplicates: count > 0,
+      count,
+    }
+  })
+  return duplicateIndex
+}
 
 const REFLECTIVE_PHASES = new Set([
   SYNC_PHASES.SYNCED,
@@ -92,6 +131,7 @@ const reconcileLocalTruth = ({ remoteVersionOverride } = {}) => {
   state.remoteVersion = resolvedRemoteVersion
   const signature = buildSignature(state.lists)
   if (!state.initialized) {
+    state.duplicateIndex = buildDuplicateIndex(state.lists)
     return { signature, inSync: false }
   }
   const inSync = signature === state.lastSyncedSignature
@@ -99,6 +139,7 @@ const reconcileLocalTruth = ({ remoteVersionOverride } = {}) => {
   if (!state.syncing && !state.pendingRetry && REFLECTIVE_PHASES.has(state.syncPhase)) {
     state.syncPhase = inSync ? SYNC_PHASES.SYNCED : SYNC_PHASES.LOCAL_ONLY
   }
+  state.duplicateIndex = buildDuplicateIndex(state.lists)
   return { signature, inSync }
 }
 
@@ -443,6 +484,12 @@ export const syncStore = {
   },
   get snackbar() {
     return state.snackbar
+  },
+  get duplicates() {
+    return state.duplicateIndex
+  },
+  getDuplicateMeta(listId) {
+    return state.duplicateIndex[listId] || EMPTY_DUPLICATE_META
   },
   get initialized() {
     return state.initialized

@@ -11,6 +11,7 @@
 
   let isReady = $derived(syncStore.initialized);
   let lists = $derived(syncStore.lists);
+  let duplicateIndex = $derived(syncStore.duplicates);
 
   $effect(() => {
     if (!isReady) return;
@@ -117,6 +118,9 @@
     });
     return Array.from(tagSet).sort();
   });
+
+  const duplicateMeta = (listId) =>
+    duplicateIndex[listId] || { hasDuplicates: false, count: 0 };
 
   function toggleExpand(listId) {
     if (expandedLists.has(listId)) {
@@ -419,6 +423,15 @@
                   <span class="stash-date">
                     <i class="fas fa-clock"></i>
                     {new Date(list.time).toLocaleDateString()}
+                  </span>
+                {/if}
+                {#if duplicateMeta(list._id).hasDuplicates}
+                  <span
+                    class="duplicate-indicator"
+                    title="This stash shares URLs with other stashes"
+                  >
+                    <span class="duplicate-dot" aria-hidden="true"></span>
+                    Duplicates {duplicateMeta(list._id).count}
                   </span>
                 {/if}
               </div>

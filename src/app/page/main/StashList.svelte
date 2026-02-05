@@ -14,6 +14,7 @@
   // Lists from store
   let lists = $derived(syncStore.lists);
   let pinnedLists = $derived(syncStore.pinnedLists);
+  let duplicateIndex = $derived(syncStore.duplicates);
 
   // Simple search filter
   const matchFilter = (list) => {
@@ -69,6 +70,9 @@
     if (updatedTabs.length === 0) syncStore.removeList(list._id);
     else syncStore.updateList(list._id, { tabs: updatedTabs });
   }
+
+  const duplicateMeta = (listId) =>
+    duplicateIndex[listId] || { hasDuplicates: false, count: 0 };
 
   function updateTitle(list, newTitle) {
     syncStore.updateList(list._id, { title: newTitle });
@@ -137,6 +141,16 @@
                   {#each list.tags as tag}
                     <span class="tag">#{tag}</span>
                   {/each}
+                </span>
+              {/if}
+              {#if duplicateMeta(list._id).hasDuplicates}
+                <span class="separator">·</span>
+                <span
+                  class="duplicate-indicator"
+                  title="This stash shares URLs with other stashes"
+                >
+                  <span class="duplicate-dot" aria-hidden="true"></span>
+                  Duplicates {duplicateMeta(list._id).count}
                 </span>
               {/if}
             </div>

@@ -16,7 +16,7 @@ const clientConfig = {
     __CLIENT_ID__: '530831729511-eq8apt6dhjimbmdli90jp2ple0lfmn3l.apps.googleusercontent.com',
     __DEV_CSP_SCRIPT__: '',
     __DEV_CSP_CONNECT__: '',
-    __EXT_NAME__: 'IceTab (dev)',
+    __EXT_NAME__: 'SquirrlTab (dev)',
     __CONTENT_SCRIPTS_MATCHES__: process.env.MOZ ? '*://*/*' : 'http://127.0.0.1:8000/*',
   },
   production: {

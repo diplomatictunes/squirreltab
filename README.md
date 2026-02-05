@@ -1,4 +1,4 @@
-# IceTab: Better OneTab **RELOADED**
+# SquirrlTab: Better OneTab **RELOADED**
 
 **(Based on the archived [Better OneTab](https://github.com/cnwangjie/better-onetab) by cnwangjie)**
 
@@ -7,12 +7,12 @@ This project is a continuation and maintenance effort for the excellent [Better 
 ---
 
 <p align="center">
-  <img src="IceTab_banner.png">
+  <img src="SquirrlTab_banner.png">
 </p>
 
 <p align="center">
-<a href="https://github.com/elijahcommits/icetab/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=elijahcommits/icetab" />
+<a href="https://github.com/elijahcommits/SquirrlTab/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=elijahcommits/SquirrlTab" />
 </a>
 <p align="center">^graphic made using <a href="https://contrib.rocks">contrib.rocks</a></p>
 </p>
@@ -32,7 +32,7 @@ More beautiful and more feature.
 
 ### Features
 
-[Send us a feature request.](https://github.com/elijahcommits/icetab/issues/new)
+[Send us a feature request.](https://github.com/elijahcommits/SquirrlTab/issues/new)
 
  - [x] Basic features of OneTab
  - [x] Dark Mode / Night Mode!
@@ -50,7 +50,7 @@ More details in [changelog](CHANGELOG.md)
 
 ### Next step
 
-You can learn more about the next steps of IceTab at [project page](https://github.com/elijahcommits/IceTab/projects/1) and leave your comment in [issues page](https://github.com/elijahcommits/better-onetab/issues).
+You can learn more about the next steps of SquirrlTab at [project page](https://github.com/elijahcommits/SquirrlTab/projects/1) and leave your comment in [issues page](https://github.com/elijahcommits/better-onetab/issues).
 
 ### Installation
 

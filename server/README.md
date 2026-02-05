@@ -1,4 +1,4 @@
-# IceTab Backend Server
+# SquirrlTab Backend Server
 
 A lightweight FastAPI backend for tab synchronization and AI-powered categorization.
 

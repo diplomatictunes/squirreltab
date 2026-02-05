@@ -1,6 +1,6 @@
 {
   "ext_name": {
-    "message": "IceTab"
+    "message": "SquirrlTab"
   },
   "ext_desc": {
     "message": "A better OneTab"
@@ -36,7 +36,7 @@
     "message": "store into a titled list"
   },
   "menu_SAVE_TAB_TO_SPINE": {
-    "message": "Save tab to IceTab"
+    "message": "Save tab to SquirrlTab"
   },
   "cmd_store_selected_tabs": {
     "message": "Store selected tabs"
@@ -330,7 +330,7 @@
     "message": "untitled"
   },
   "ui_updated_to_ver": {
-    "message": "IceTab has updated to"
+    "message": "SquirrlTab has updated to"
   },
   "ui_click_view_changelog": {
     "message": "click to view detail changelog"

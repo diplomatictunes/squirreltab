@@ -1,41 +1,75 @@
 <script>
-  import { syncStore } from "./store/syncStore.svelte.js";
-  import Drawer from "./component/main/Drawer.svelte";
-  import Toolbar from "./component/main/Toolbar.svelte";
-  import DetailList from "./page/main/DetailList.svelte";
+  import { onMount } from "svelte";
+  import { isPopupContext } from "@/common/runtimeContext";
+  import Popup from "./page/popup/Popup.svelte";
+  import StashList from "./page/main/StashList.svelte";
   import SettingsView from "./page/settings/SettingsView.svelte";
   import Snackbar from "./component/main/Snackbar.svelte";
 
-  let drawerOpen = $state(false);
-  let activeView = $state("all");
+  const isPopup = isPopupContext();
+  let activeView = $state("list"); // 'list' | 'settings'
 
-  function handleViewChange(view) {
-    activeView = view;
-    drawerOpen = false;
+  onMount(() => {
+    // Basic hash routing support
+    if (window.location.hash.includes("/options")) {
+      activeView = "settings";
+    }
+
+    window.addEventListener("hashchange", () => {
+      if (window.location.hash.includes("/options")) {
+        activeView = "settings";
+      } else {
+        activeView = "list";
+      }
+    });
+  });
+
+  function toggleSettings() {
+    if (activeView === "settings") {
+      activeView = "list";
+      window.location.hash = "/app/";
+    } else {
+      activeView = "settings";
+      window.location.hash = "/app/options";
+    }
   }
 </script>
 
-<div class="app">
-  <Toolbar
-    onToggleDrawer={() => (drawerOpen = !drawerOpen)}
-    onOpenSettings={() => {
-      activeView = "options";
-      drawerOpen = false;
-    }}
-  />
-
-  <Drawer bind:open={drawerOpen} onSetView={handleViewChange} />
-
-  <main class="main-content">
-    {#if activeView === "options"}
-      <SettingsView onBack={() => (activeView = "all")} />
+{#if isPopup}
+  <Popup />
+  <!-- Popup has its own status/handling, doesn't need global Snackbar usually, 
+       but if we want error messages to bubble up we can include it. 
+       Popup.svelte handles errors visually, so we can omit Snackbar to save space/complexity. 
+  -->
+{:else}
+  <!-- Full Tab Application -->
+  <main class="app-container">
+    {#if activeView === "settings"}
+      <div class="settings-layout">
+        <header class="settings-header">
+          <button class="back-btn" onclick={toggleSettings}>
+            <i class="fas fa-arrow-left"></i> Back to Stashes
+          </button>
+        </header>
+        <SettingsView onBack={toggleSettings} />
+      </div>
     {:else}
-      <DetailList {activeView} />
-    {/if}
-  </main>
+      <StashList />
 
-  <Snackbar />
-</div>
+      <!-- Subtle Settings Access -->
+      <button
+        class="settings-fab"
+        onclick={toggleSettings}
+        title="Settings"
+        aria-label="Open Settings"
+      >
+        <i class="fas fa-cog"></i>
+      </button>
+    {/if}
+
+    <Snackbar />
+  </main>
+{/if}
 
 <style>
   :global(body) {
@@ -45,27 +79,71 @@
       "Helvetica Neue", Arial, sans-serif;
     background: #141517;
     color: #e4e4e7;
-    overflow: hidden;
+    overflow-x: hidden; /* Prevent horizontal scroll */
   }
 
   :global(*) {
     box-sizing: border-box;
   }
 
-  .app {
+  .app-container {
+    min-height: 100vh;
+    position: relative;
+    /* Clean layout, no fixed headers here */
+  }
+
+  .settings-layout {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 32px;
+  }
+
+  .settings-header {
+    margin-bottom: 24px;
+  }
+
+  .back-btn {
+    background: none;
+    border: none;
+    color: #71717a;
+    font-size: 14px;
+    cursor: pointer;
     display: flex;
-    flex-direction: column;
-    height: 100vh;
-    background: #141517;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
   }
 
-  .main-content {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
+  .back-btn:hover {
+    color: #e4e4e7;
   }
 
-  /* Custom Scrollbar */
+  .settings-fab {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: transparent;
+    border: 1px solid #27272a;
+    color: #71717a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 100;
+  }
+
+  .settings-fab:hover {
+    background: #27272a;
+    color: #e4e4e7;
+    border-color: #3f3f46;
+    transform: rotate(45deg);
+  }
+
+  /* Scrollbar Polish */
   :global(::-webkit-scrollbar) {
     width: 8px;
     height: 8px;

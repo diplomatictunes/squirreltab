@@ -509,7 +509,7 @@ browser.runtime.onMessage.addListener(message => {
   if (message.type === RUNTIME_MESSAGES.STASH_FAILED) {
     const reason = message.payload?.reason
     const msg = reason === 'BLOCKED_URL'
-      ? 'Cannot stash the IceTab app itself'
+      ? 'Cannot stash the SquirrlTab app itself'
       : 'Unable to stash current tab'
     syncStore.updateSnackbar(msg)
   }

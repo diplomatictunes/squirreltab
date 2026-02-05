@@ -14,7 +14,7 @@ export const logger = {
     if (logs.length > 100) logs.shift(); // keep it light
 
     // Also log to console for dev
-    console[type === 'error' ? 'error' : 'log'](`[IceTab] ${message}`, data || '');
+    console[type === 'error' ? 'error' : 'log'](`[SquirrlTab] ${message}`, data || '');
   },
 
   clear() {

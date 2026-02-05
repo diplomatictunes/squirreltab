@@ -88,7 +88,7 @@ export const setupContextMenus = async (opts = null) => {
   if (!effectiveOpts.pageContext) return
 
   const contexts = effectiveOpts.allContext ? ['all'] : ['page']
-  const title = __('menu_SAVE_TAB_TO_SPINE') || 'Save tab to IceTab'
+  const title = __('menu_SAVE_TAB_TO_SPINE') || 'Save tab to SquirrlTab'
 
   await createMenuItem({
     id: MENU_ID_SAVE_TAB,

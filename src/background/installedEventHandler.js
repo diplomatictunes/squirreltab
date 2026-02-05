@@ -6,7 +6,7 @@ const installedEventHandler = detail => {
     const updatedNotificationId = 'updated'
     chrome.notifications.onClicked.addListener(id => {
       if (id === updatedNotificationId) {
-        chrome.tabs.create({ url: 'https://github.com/elijahcommits/icetab/blob/master/CHANGELOG.md' })
+        chrome.tabs.create({ url: 'https://github.com/elijahcommits/SquirrlTab/blob/master/CHANGELOG.md' })
       }
     })
     chrome.notifications.create(updatedNotificationId, {

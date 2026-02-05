@@ -1,6 +1,6 @@
 {
    "cmd_open_lists": {
-     "message":"IceTab"
+     "message":"SquirrlTab"
    },
    "cmd_restore_lastest_list": {
      "message":"Letzte Tabs wiederherstellen"
@@ -18,7 +18,7 @@
      "message":"Ein besseres OneTab"
    },
    "ext_name": {
-     "message":"IceTab"
+     "message":"SquirrlTab"
    },
    "menu_EXTRA": {
      "message":"Extra"
@@ -48,7 +48,7 @@
     "message":"Speichere in benannte Liste"
   },
   "menu_SAVE_TAB_TO_SPINE": {
-    "message":"Tab in IceTab speichern"
+    "message":"Tab in SquirrlTab speichern"
   },
   "menu_STORE_TWOSIDE_TABS": {
     "message":"Speichere nicht ausgewählte Tabs"
@@ -324,7 +324,7 @@
      "message":"Unbenannt"
    },
    "ui_updated_to_ver": {
-     "message":"IceTab wurde aktualisiert zu"
+     "message":"SquirrlTab wurde aktualisiert zu"
    },
    "ui_click_view_changelog": {
      "message":"Klicken Sie hier, um das Änderungsprotokoll anzuzeigen"

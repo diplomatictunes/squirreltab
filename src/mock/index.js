@@ -97,7 +97,7 @@ const mockBrowser = {
         ui_pin: 'Pin',
         ui_restore_all: 'Restore All',
         ui_nightmode: 'Night Mode',
-        ext_name: 'IceTab Dev',
+        ext_name: 'SquirrlTab Dev',
         ext_desc: 'Development Mode'
       };
       return messages[key] || key;

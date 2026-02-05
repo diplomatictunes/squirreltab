@@ -77,6 +77,18 @@
   function updateTitle(list, newTitle) {
     syncStore.updateList(list._id, { title: newTitle });
   }
+
+  async function acceptAiName(list, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.acceptAiSuggestion(list._id);
+  }
+
+  async function rejectAiName(list, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.rejectAiSuggestion(list._id);
+  }
 </script>
 
 <div class="stash-layout">
@@ -154,6 +166,33 @@
                 </span>
               {/if}
             </div>
+            {#if list.aiSuggestedTitle}
+              <div
+                class="ai-name-suggestion compact"
+                onclick={(event) => event.stopPropagation()}
+              >
+                <div class="ai-suggestion-body">
+                  <span class="ai-chip">Suggested</span>
+                  <span class="ai-value">{list.aiSuggestedTitle}</span>
+                </div>
+                <div class="ai-suggestion-actions">
+                  <button
+                    class="ai-btn"
+                    type="button"
+                    onclick={(event) => acceptAiName(list, event)}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    class="ai-btn ghost"
+                    type="button"
+                    onclick={(event) => rejectAiName(list, event)}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            {/if}
           </div>
 
           <!-- Actions (Hidden until hover) -->

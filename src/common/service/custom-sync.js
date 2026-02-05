@@ -105,6 +105,9 @@ export const AI = {
   categorize: async tabs => {
     return fetchData('/ai/categorize', 'POST', { tabs })
   },
+  suggestName: async tabs => {
+    return fetchData('/ai/name', 'POST', { tabs })
+  },
 }
 
 export default {

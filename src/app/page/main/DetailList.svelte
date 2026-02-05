@@ -119,9 +119,6 @@
     return Array.from(tagSet).sort();
   });
 
-  const duplicateMeta = (listId) =>
-    duplicateIndex[listId] || { hasDuplicates: false, count: 0 };
-
   function toggleExpand(listId) {
     if (expandedLists.has(listId)) {
       expandedLists.delete(listId);
@@ -198,6 +195,9 @@
     }
   }
 
+  const duplicateMeta = (listId) =>
+    duplicateIndex[listId] || { hasDuplicates: false, count: 0 };
+
   async function handleDelete(list) {
     if (!list) return;
     menuOpenFor = null;
@@ -235,6 +235,18 @@
     if (!list) return;
     const tags = (list.tags || []).filter((t) => t !== tag);
     syncStore.updateList(list._id, { tags });
+  }
+
+  async function acceptAiName(list, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.acceptAiSuggestion(list._id);
+  }
+
+  async function rejectAiName(list, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.rejectAiSuggestion(list._id);
   }
 
   // Popup UI dispatches stash intent only; background performs all tab and storage work.
@@ -435,6 +447,33 @@
                   </span>
                 {/if}
               </div>
+              {#if list.aiSuggestedTitle}
+                <div
+                  class="ai-name-suggestion"
+                  onclick={(event) => event.stopPropagation()}
+                >
+                  <div class="ai-suggestion-body">
+                    <span class="ai-chip">Suggested</span>
+                    <span class="ai-value">{list.aiSuggestedTitle}</span>
+                  </div>
+                  <div class="ai-suggestion-actions">
+                    <button
+                      class="ai-btn"
+                      type="button"
+                      onclick={(event) => acceptAiName(list, event)}
+                    >
+                      Accept
+                    </button>
+                    <button
+                      class="ai-btn ghost"
+                      type="button"
+                      onclick={(event) => rejectAiName(list, event)}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              {/if}
             </div>
 
             <div class="card-actions">

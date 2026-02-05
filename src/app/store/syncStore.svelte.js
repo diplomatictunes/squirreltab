@@ -571,6 +571,31 @@ export const syncStore = {
   updateList(listId, updates) {
     manager.updateListById(listId, updates)
   },
+  async acceptAiSuggestion(listId) {
+    const list = state.lists.find(l => l._id === listId)
+    if (!list?.aiSuggestedTitle) return false
+    try {
+      await manager.updateListById(listId, { title: list.aiSuggestedTitle, aiSuggestedTitle: '' })
+      state.snackbar = { status: true, msg: 'AI suggestion applied', type: 'success' }
+      return true
+    } catch (error) {
+      console.error('[SquirrlTab] Failed to accept AI suggestion:', error)
+      state.snackbar = { status: true, msg: 'Unable to apply suggestion', type: 'error' }
+      return false
+    }
+  },
+  async rejectAiSuggestion(listId) {
+    const list = state.lists.find(l => l._id === listId)
+    if (!list?.aiSuggestedTitle) return false
+    try {
+      await manager.updateListById(listId, { aiSuggestedTitle: '' })
+      return true
+    } catch (error) {
+      console.error('[SquirrlTab] Failed to reject AI suggestion:', error)
+      state.snackbar = { status: true, msg: 'Unable to dismiss suggestion', type: 'error' }
+      return false
+    }
+  },
   async removeList(listId) {
     return removeListSafely(listId)
   },

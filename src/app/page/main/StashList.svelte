@@ -55,9 +55,9 @@
     await syncStore.restoreList(list._id, false);
   }
 
-  function handleDelete(list) {
+  async function handleDelete(list) {
     if (!confirm("Delete stash?")) return;
-    syncStore.removeList(list._id);
+    await syncStore.removeList(list._id);
   }
 
   function togglePin(list) {

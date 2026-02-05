@@ -78,6 +78,49 @@ let state = $state({
   pendingRetry: null,
 })
 
+const REFLECTIVE_PHASES = new Set([
+  SYNC_PHASES.SYNCED,
+  SYNC_PHASES.LOCAL_ONLY,
+  SYNC_PHASES.IDLE,
+  SYNC_PHASES.NEVER_SYNCED,
+])
+
+const reconcileLocalTruth = ({ remoteVersionOverride } = {}) => {
+  const resolvedRemoteVersion = typeof remoteVersionOverride === 'number'
+    ? remoteVersionOverride
+    : computeVersion(state.lists)
+  state.remoteVersion = resolvedRemoteVersion
+  const signature = buildSignature(state.lists)
+  if (!state.initialized) {
+    return { signature, inSync: false }
+  }
+  const inSync = signature === state.lastSyncedSignature
+  state.localOnly = !inSync
+  if (!state.syncing && !state.pendingRetry && REFLECTIVE_PHASES.has(state.syncPhase)) {
+    state.syncPhase = inSync ? SYNC_PHASES.SYNCED : SYNC_PHASES.LOCAL_ONLY
+  }
+  return { signature, inSync }
+}
+
+const finalizeSignatureAlignment = ({ remoteVersionOverride } = {}) => {
+  const { inSync } = reconcileLocalTruth({ remoteVersionOverride })
+  if (state.initialized && inSync) {
+    state.lastSyncedAt = Date.now()
+    state.lastSyncSuccess = true
+  }
+}
+
+const removeListSafely = async listId => {
+  try {
+    await manager.removeListById(listId)
+    return true
+  } catch (error) {
+    console.error('[SquirrlTab] Failed to remove list:', error)
+    state.snackbar = { status: true, msg: 'Unable to delete stash', type: 'error' }
+    return false
+  }
+}
+
 const waitForNextTick = () => new Promise(resolve => {
   if (typeof queueMicrotask === 'function') queueMicrotask(resolve)
   else setTimeout(resolve, 0)
@@ -93,7 +136,7 @@ const confirmLocalListsHydrated = async baselineSignature => {
   if (latestSignature !== baselineSignature) {
     state.lists = latestLists
     state.lastSyncedSignature = latestSignature
-    state.remoteVersion = computeVersion(latestLists)
+    reconcileLocalTruth()
   }
 }
 
@@ -145,6 +188,8 @@ const pushStateToServer = async payload => {
     state.localOnly = false
     state.pendingRetry = null
     pendingPayload = null
+    state.lastSyncedSignature = payload.signature
+    finalizeSignatureAlignment({ remoteVersionOverride: remoteVersion })
     browser.storage.local.set({ lastSyncedSignature: payload.signature }) // Persist signature
     logSyncEvent('push_success', {
       listCount: payload.lists?.length || 0,
@@ -230,12 +275,12 @@ const hydrateFromRemote = async () => {
     if (remoteVersion > localVersion) {
       const signature = buildSignature(normalizedRemote)
       state.lastSyncedSignature = signature
-      state.remoteVersion = remoteVersion
       state.lastSyncSuccess = true
       await storage.setLists(normalizedRemote)
       console.log('[hydrate] setting lists:', normalizedRemote.length)
       state.lists = normalizedRemote
-      state.lastSyncedAt = Date.now()
+      finalizeSignatureAlignment({ remoteVersionOverride: remoteVersion })
+      state.localOnly = false
       state.syncPhase = SYNC_PHASES.SYNCED
       browser.storage.local.set({ lastSyncedSignature: signature }) // Persist signature
       logSyncEvent('hydrate_success', {
@@ -278,8 +323,9 @@ const hydrateFromRemote = async () => {
     // This prevents the UI from clearing or hiding the lists 
     // just because the server at localhost:8000 is down.
     if (state.lists.length === 0) {
-      const data = await browser.storage.local.get('lists');
-      state.lists = Array.isArray(data.lists) ? data.lists : [];
+      const data = await browser.storage.local.get('lists')
+      state.lists = Array.isArray(data.lists) ? data.lists : []
+      reconcileLocalTruth()
     }
 
     state.snackbar = { status: true, msg: normalized.message, type: 'error' } // Notify error
@@ -342,6 +388,7 @@ const initStore = async (retries = 3) => {
       }
       await confirmLocalListsHydrated(baselineSignature)
       state.initialized = true
+      reconcileLocalTruth()
       setupAutoSyncTimer()
       if (isAutoSyncEnabled(state.opts)) {
         hydrateFromRemote()
@@ -358,11 +405,16 @@ browser.storage.onChanged.addListener((changes, area) => {
     const newLists = changes.lists.newValue
     state.lists = Array.isArray(newLists) ? newLists : []
     console.log('[SquirrlTab] Lists updated from storage:', state.lists.length)
+    reconcileLocalTruth()
   }
   if (changes.opts) {
     state.opts = changes.opts.newValue || {}
     console.log('[SquirrlTab] Options updated from storage')
     setupAutoSyncTimer()
+  }
+  if (changes.lastSyncedSignature) {
+    state.lastSyncedSignature = changes.lastSyncedSignature.newValue || ''
+    finalizeSignatureAlignment()
   }
 })
 
@@ -465,14 +517,15 @@ export const syncStore = {
       return true
     } catch (error) {
       console.error('[SquirrlTab] Failed to restore list:', error)
-      throw error
+      state.snackbar = { status: true, msg: 'Failed to restore tabs', type: 'error' }
+      return false
     }
   },
   updateList(listId, updates) {
     manager.updateListById(listId, updates)
   },
-  removeList(listId) {
-    manager.removeListById(listId)
+  async removeList(listId) {
+    return removeListSafely(listId)
   },
   pinList(listId, pinned) {
     manager.updateListById(listId, { pinned })
@@ -504,7 +557,8 @@ export const syncStore = {
   async cleanAll() {
     const ids = state.lists.map(l => l._id)
     for (const id of ids) {
-      manager.removeListById(id)
+      const removed = await removeListSafely(id)
+      if (!removed) break
     }
   },
 }

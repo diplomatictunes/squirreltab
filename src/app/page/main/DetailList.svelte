@@ -194,13 +194,15 @@
     }
   }
 
-  function handleDelete(list) {
+  async function handleDelete(list) {
     if (!list) return;
     menuOpenFor = null;
     const confirmed = confirm("Delete this stash permanently?");
     if (!confirmed) return;
-    syncStore.removeList(list._id);
-    syncStore.updateSnackbar("Stash deleted");
+    const removed = await syncStore.removeList(list._id);
+    if (removed) {
+      syncStore.updateSnackbar("Stash deleted");
+    }
   }
 
   async function runAiCategorization(list) {

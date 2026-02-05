@@ -145,6 +145,10 @@ const pushStateToServer = async payload => {
     state.localOnly = false
     state.pendingRetry = null
     pendingPayload = null
+    state.lastSyncedSignature = payload.signature
+    state.lastSyncedAt = Date.now()
+    state.lastSyncSuccess = true
+    state.remoteVersion = remoteVersion
     browser.storage.local.set({ lastSyncedSignature: payload.signature }) // Persist signature
     logSyncEvent('push_success', {
       listCount: payload.lists?.length || 0,

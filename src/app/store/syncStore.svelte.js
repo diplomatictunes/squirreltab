@@ -78,6 +78,25 @@ let state = $state({
   pendingRetry: null,
 })
 
+const waitForNextTick = () => new Promise(resolve => {
+  if (typeof queueMicrotask === 'function') queueMicrotask(resolve)
+  else setTimeout(resolve, 0)
+})
+
+// MV3 popups cold-start before background writes settle. A post-listener re-read
+// keeps initialized=false until we confirm storage reflects the latest lists.
+const confirmLocalListsHydrated = async baselineSignature => {
+  await waitForNextTick()
+  const latest = await browser.storage.local.get('lists')
+  const latestLists = Array.isArray(latest.lists) ? latest.lists : []
+  const latestSignature = buildSignature(latestLists)
+  if (latestSignature !== baselineSignature) {
+    state.lists = latestLists
+    state.lastSyncedSignature = latestSignature
+    state.remoteVersion = computeVersion(latestLists)
+  }
+}
+
 const normalizeSyncError = error => {
   if (error instanceof SyncError) {
     const phaseMap = {
@@ -281,11 +300,13 @@ const hydrateFromRemote = async () => {
 
 const initStore = async (retries = 3) => {
   let shouldFinalize = true
+  let baselineSignature = ''
   try {
     const data = await browser.storage.local.get(['lists', 'opts'])
     state.lists = Array.isArray(data.lists) ? data.lists : []
     state.opts = data.opts || {}
     state.lastSyncedSignature = buildSignature(state.lists)
+    baselineSignature = state.lastSyncedSignature
     state.remoteVersion = computeVersion(state.lists)
     state.lastSyncSuccess = null
     state.localOnly = false
@@ -303,8 +324,15 @@ const initStore = async (retries = 3) => {
     state.lastSyncSuccess = false
     state.localOnly = true
     state.syncPhase = SYNC_PHASES.LOCAL_ONLY
+    state.lastSyncedSignature = buildSignature(state.lists)
+    baselineSignature = state.lastSyncedSignature
   } finally {
     if (shouldFinalize) {
+      if (!baselineSignature) {
+        baselineSignature = buildSignature(state.lists)
+        state.lastSyncedSignature = baselineSignature
+      }
+      await confirmLocalListsHydrated(baselineSignature)
       state.initialized = true
       setupAutoSyncTimer()
       if (isAutoSyncEnabled(state.opts)) {

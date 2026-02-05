@@ -6,10 +6,24 @@
   import { sendStashCurrentTabIntent } from "@/common/intents";
   import { getRuntimeSource, isPopupContext } from "@/common/runtimeContext";
 
-  let { activeView = "all" } = $props();
+  const props = $props();
+  let activeView = $derived(props.activeView ?? "all");
 
   let isReady = $derived(syncStore.initialized);
   let lists = $derived(syncStore.lists);
+
+  $effect(() => {
+    if (!isReady) return;
+    console.log(
+      "[DetailList] lists snapshot",
+      lists.map((l) => ({
+        id: l._id,
+        hasTabs: Array.isArray(l.tabs),
+        tabCount: l.tabs?.length,
+      })),
+    );
+  });
+
   let sortMode = $state("newest");
   const runtimeSource = getRuntimeSource();
   const popupContext = isPopupContext();
@@ -48,12 +62,16 @@
     if (!filterQuery.trim()) return true;
     const needle = filterQuery.trim().toLowerCase();
     const titleMatch = (list.title || "").toLowerCase().includes(needle);
-    const tagMatch = (list.tags || []).some((tag) => tag.toLowerCase().includes(needle));
+    const tagMatch = (list.tags || []).some((tag) =>
+      tag.toLowerCase().includes(needle),
+    );
     return titleMatch || tagMatch;
   };
 
-  let visibleLists = $derived(() => {
-    if (!isReady) return [];
+  let visibleLists = $derived.by(() => {
+    // FIX: Do not return early on !isReady. This ensures the dependency on `lists`
+    // is always tracked by the derived store, preventing stale empty states.
+    // if (!isReady) return [];
 
     let base = lists;
     if (activeView === "pinned") {
@@ -64,10 +82,20 @@
     }
     const filtered = base.filter(matchFilter);
     const comparator = sortComparators[sortMode] || sortComparators.newest;
-    return [...filtered].sort(comparator);
+
+    const result = [...filtered].sort(comparator);
+
+    console.log("[DetailList] computing visibleLists", {
+      total: lists.length,
+      activeView,
+      visible: result.length,
+      isReady,
+    });
+
+    return result;
   });
 
-  let totalBeforeFilter = $derived(() => {
+  let totalBeforeFilter = $derived.by(() => {
     if (activeView === "pinned") return syncStore.pinnedLists.length;
     if (activeView.startsWith("tag:")) {
       const tag = activeView.substring(4);
@@ -77,7 +105,9 @@
   });
 
   let isFiltered = $derived(() => filterQuery.trim().length > 0);
-  let filteredOutCount = $derived(() => totalBeforeFilter - visibleLists.length);
+  let filteredOutCount = $derived(
+    () => totalBeforeFilter - visibleLists.length,
+  );
 
   // Extract all unique tags from all lists for autocomplete
   let allKnownTags = $derived(() => {
@@ -141,7 +171,7 @@
           `\u2713 Reopen all ${list.tabs?.length || 0} tabs\n` +
           `\u2717 Delete this stash permanently\n\n` +
           `Tip: Pin the stash first if you want to keep it.\n\n` +
-          `Continue with restore?`
+          `Continue with restore?`,
       );
       if (!confirmed) return;
     } else {
@@ -150,7 +180,7 @@
           `Restoring will:\n` +
           `\u2713 Reopen all ${list.tabs?.length || 0} tabs\n` +
           `\u2713 Keep this stash for future use\n\n` +
-          `Continue?`
+          `Continue?`,
       );
       if (!confirmed) return;
     }
@@ -159,7 +189,7 @@
       syncStore.updateSnackbar(
         list.pinned
           ? "Tabs restored (stash kept because it is pinned)"
-          : "Tabs restored and stash cleared"
+          : "Tabs restored and stash cleared",
       );
     }
   }
@@ -176,7 +206,7 @@
   async function runAiCategorization(list) {
     if (!list) return;
     const confirmed = confirm(
-      "AI categorization will replace the current category and tags for this stash. Continue?"
+      "AI categorization will replace the current category and tags for this stash. Continue?",
     );
     if (!confirmed) return;
     try {
@@ -207,7 +237,10 @@
     emptyStashLoading = true;
     sendStashCurrentTabIntent(runtimeSource)
       .catch((error) => {
-        console.error("[SquirrlTab] Failed to dispatch stash intent from popup:", error);
+        console.error(
+          "[SquirrlTab] Failed to dispatch stash intent from popup:",
+          error,
+        );
       })
       .finally(() => {
         emptyStashLoading = false;
@@ -258,8 +291,14 @@
         {/if}
       </p>
       {#if activeView === "all" && popupContext}
-        <button class="action-button" onclick={stashCurrentTabFromEmpty} disabled={emptyStashLoading}>
-          <i class={`fas ${emptyStashLoading ? "fa-spinner fa-spin" : "fa-plus"}`}></i>
+        <button
+          class="action-button"
+          onclick={stashCurrentTabFromEmpty}
+          disabled={emptyStashLoading}
+        >
+          <i
+            class={`fas ${emptyStashLoading ? "fa-spinner fa-spin" : "fa-plus"}`}
+          ></i>
           <span>{emptyStashLoading ? "Stashing..." : "Stash Current Tab"}</span>
         </button>
       {/if}
@@ -304,7 +343,11 @@
             aria-label="Filter stashes"
           />
           {#if filterQuery}
-            <button class="clear-filter" onclick={() => (filterQuery = "")} aria-label="Clear filter">
+            <button
+              class="clear-filter"
+              onclick={() => (filterQuery = "")}
+              aria-label="Clear filter"
+            >
               <i class="fas fa-times"></i>
             </button>
           {/if}
@@ -384,11 +427,9 @@
                 class="card-btn pin"
                 class:pinned={list.pinned}
                 onclick={() => syncStore.pinList(list._id, !list.pinned)}
-                title={
-                  list.pinned
-                    ? "Unpin (stash will be deleted when restored)"
-                    : "Pin (stash will be kept after restore)"
-                }
+                title={list.pinned
+                  ? "Unpin (stash will be deleted when restored)"
+                  : "Pin (stash will be kept after restore)"}
               >
                 <i class="fas fa-thumbtack"></i>
               </button>
@@ -439,7 +480,9 @@
               </div>
             </div>
             {#if !list.pinned}
-              <p class="restore-hint">Restoring removes this stash unless it is pinned.</p>
+              <p class="restore-hint">
+                Restoring removes this stash unless it is pinned.
+              </p>
             {/if}
           </div>
 
@@ -505,10 +548,10 @@
                 <span class="tag muted">No tags yet</span>
               {/if}
             </div>
-            
+
             <TagInput
               existingTags={list.tags || []}
-              allKnownTags={allKnownTags}
+              {allKnownTags}
               onAdd={(tag) => addTag(list, tag)}
               placeholder="Add a tag..."
             />

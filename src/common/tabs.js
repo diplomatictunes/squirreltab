@@ -1,11 +1,11 @@
 import storage from './storage'
-import {createNewTabList} from './list'
+import { createNewTabList } from './list'
 import listManager from './listManager'
-import {ILLEGAL_URLS} from './constants'
-import {Mutex} from './utils'
+import { ILLEGAL_URLS } from './constants'
+import { Mutex } from './utils'
 
 
-const getAllInWindow = windowId => chrome.tabs.query({windowId})
+const getAllInWindow = windowId => chrome.tabs.query({ windowId })
 
 const APP_TAB_ID_KEY = 'appTabIds' // Define a key for storing app tab IDs in storage
 
@@ -40,7 +40,7 @@ const openAboutPage = () => {
   window.open(chrome.runtime.getURL('index.html#/app/about'))
 }
 
-const getSelectedTabs = () => chrome.tabs.query({highlighted: true, currentWindow: true})
+const getSelectedTabs = () => chrome.tabs.query({ highlighted: true, currentWindow: true })
 
 const getAllTabsInCurrentWindow = async () => {
   const currentWindow = await chrome.windows.getCurrent()
@@ -97,7 +97,7 @@ const storeTabs = async (tabs, listIndex) => {
 }
 
 const storeCurrentTab = async listIndex => {
-  const tabs = await chrome.tabs.query({active: true, currentWindow: true})
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
   if (!tabs || tabs.length === 0) throw new Error('No active tab to stash')
   return storeTabs(tabs, listIndex)
 }
@@ -137,7 +137,7 @@ const restoreTabs = async (tabs, windowId) => {
   let indexOffset = 0
   if (opts.openEnd) {
     const tabs = await getAllTabsInCurrentWindow()
-    const {index} = tabs.pop()
+    const { index } = tabs.pop()
     indexOffset = index + 1
   }
   for (let i = 0; i < tabs.length; i += 1) {
@@ -148,16 +148,16 @@ const restoreTabs = async (tabs, windowId) => {
       index: i + indexOffset,
       windowId,
     })
-    if (tab.muted) chrome.tabs.update(createdTab.id, {muted: true})
+    if (tab.muted) chrome.tabs.update(createdTab.id, { muted: true })
   }
 }
 
 const restoreList = (list, windowId) => restoreTabs(list.tabs, windowId)
 
 const restoreListInNewWindow = async list => {
-  const createdWindow = await chrome.windows.create({url: list.tabs.map(i => i.url)})
+  const createdWindow = await chrome.windows.create({ url: list.tabs.map(i => i.url) })
   list.tabs.forEach((tab, index) => {
-    if (tab.muted) chrome.tabs.update(createdWindow.tabs[index].id, {muted: true})
+    if (tab.muted) chrome.tabs.update(createdWindow.tabs[index].id, { muted: true })
   })
 }
 
@@ -180,6 +180,7 @@ export default {
   storeAllTabs,
   storeAllTabInAllWindows,
   storeCurrentTab,
+  storeTabs,
   restoreTabs,
   restoreList,
   restoreListInNewWindow,

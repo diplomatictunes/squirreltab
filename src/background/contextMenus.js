@@ -55,7 +55,7 @@ export const handleContextMenuClicked = async (info, tab) => {
   const targetTab = await resolveTab(tab, info)
   if (!targetTab) return
   try {
-    await tabs.storeCurrentTab(targetTab, 'context-menu')
+    await tabs.storeTabs([targetTab])
   } catch (error) {
     console.error('[contextMenus] Failed to save tab from context menu:', error)
   }

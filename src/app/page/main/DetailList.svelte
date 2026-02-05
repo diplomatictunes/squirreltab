@@ -216,8 +216,20 @@
     );
     if (!confirmed) return;
     try {
-      await syncStore.categorizeList(list._id);
-      syncStore.updateSnackbar("AI suggestions applied");
+      const outcome = await syncStore.categorizeList(list._id);
+      if (!outcome) return;
+      const meta = outcome.privacyMeta;
+      if (meta && meta.totalCount > 0) {
+        const excludedNote =
+          meta.excludedCount > 0
+            ? ` (${meta.excludedCount} excluded for privacy)`
+            : "";
+        syncStore.updateSnackbar(
+          `AI suggestions applied (based on ${meta.allowedCount} of ${meta.totalCount} tabs${excludedNote})`,
+        );
+      } else {
+        syncStore.updateSnackbar("AI suggestions applied");
+      }
     } catch (error) {
       syncStore.updateSnackbar("AI categorization failed");
     } finally {
@@ -520,6 +532,12 @@
                     {/each}
                   </div>
                 </div>
+              {/if}
+              {#if list.aiSuggestionMeta && (list.aiSuggestedTitle || (list.aiSuggestedTags && list.aiSuggestedTags.length))}
+                <p class="ai-privacy-note">
+                  Based on {list.aiSuggestionMeta.allowedCount} of {list.aiSuggestionMeta.totalCount} tabs
+                  ({list.aiSuggestionMeta.excludedCount} excluded for privacy)
+                </p>
               {/if}
             </div>
 

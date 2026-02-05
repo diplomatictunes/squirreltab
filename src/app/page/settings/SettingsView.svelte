@@ -3,6 +3,7 @@
   import { syncStore } from "../../store/syncStore.svelte.js";
   import CustomSync from "@/common/service/custom-sync";
   import optionsCatalog from "@/common/options";
+  import { normalizeDomain } from "@/common/utils";
   
   let { onBack } = $props();
   
@@ -25,6 +26,7 @@
     syncApiKey: "",
     autoSyncEnabled: false,
     autoSyncInterval: 300, // seconds
+    aiExcludedDomainsInput: "",
   });
   
   let saveStatus = $state(null); // "saving" | "success" | "error"
@@ -36,6 +38,20 @@
     loadSettings();
   });
   
+  const parseExcludedDomainsInput = raw => {
+    if (typeof raw !== "string") return [];
+    const tokens = raw
+      .split(/\r?\n/)
+      .map((domain) => normalizeDomain(domain))
+      .filter(Boolean);
+    return Array.from(new Set(tokens));
+  };
+
+  const stringifyExcludedDomains = domains => {
+    if (!Array.isArray(domains) || domains.length === 0) return "";
+    return domains.join("\n");
+  };
+
   async function loadSettings() {
     const opts = await browser.storage.local.get("opts");
     const storedOpts = stripUnsupportedOptionKeys(opts.opts);
@@ -43,6 +59,9 @@
     settings.syncApiKey = storedOpts.syncApiKey || "";
     settings.autoSyncEnabled = storedOpts.autoSyncEnabled ?? false;
     settings.autoSyncInterval = storedOpts.autoSyncInterval || 300;
+    settings.aiExcludedDomainsInput = stringifyExcludedDomains(
+      storedOpts.aiExcludedDomains || [],
+    );
   }
   
   async function saveSettings() {
@@ -56,6 +75,7 @@
         syncApiKey: settings.syncApiKey.trim(),
         autoSyncEnabled: settings.autoSyncEnabled,
         autoSyncInterval: settings.autoSyncInterval,
+        aiExcludedDomains: parseExcludedDomainsInput(settings.aiExcludedDomainsInput),
       };
       
       await browser.storage.local.set({ opts: updatedOpts });
@@ -114,11 +134,12 @@
   function resetToDefaults() {
     const confirmed = confirm("Reset all settings to defaults?");
     if (!confirmed) return;
-    
+
     settings.syncBaseUrl = "http://localhost:8000";
     settings.syncApiKey = "";
     settings.autoSyncEnabled = false;
     settings.autoSyncInterval = 300;
+    settings.aiExcludedDomainsInput = "";
   }
 </script>
 
@@ -213,6 +234,39 @@
           <span class="input-suffix">{Math.floor(settings.autoSyncInterval / 60)} minutes</span>
         </div>
       {/if}
+    </section>
+
+    <!-- AI Privacy Section -->
+    <section class="settings-section">
+      <div class="section-header">
+        <i class="fas fa-user-shield section-icon"></i>
+        <h2>AI Privacy</h2>
+      </div>
+
+      <div class="setting-group">
+        <label for="excluded-domains" class="setting-label">
+          Excluded Domains
+          <span class="label-hint">
+            Tabs from these domains will never be shared with AI services.
+          </span>
+        </label>
+        <textarea
+          id="excluded-domains"
+          class="setting-textarea"
+          rows="4"
+          bind:value={settings.aiExcludedDomainsInput}
+          placeholder="example.com&#10;internal.company"
+        ></textarea>
+        <p class="setting-hint">Enter one domain per line. Subdomains are also excluded.</p>
+      </div>
+
+      <div class="privacy-summary">
+        <i class="fas fa-info-circle"></i>
+        <span>
+          Naming and tagging suggestions will disclose how many tabs were used
+          (and how many were excluded for privacy).
+        </span>
+      </div>
     </section>
     
     <!-- About Section -->
@@ -390,6 +444,48 @@
   
   .setting-input.small {
     width: 120px;
+  }
+
+  .setting-textarea {
+    width: 100%;
+    padding: 12px 14px;
+    background: #25262b;
+    border: 1px solid #2c2e33;
+    border-radius: 8px;
+    color: #e4e4e7;
+    font-size: 0.875rem;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 120px;
+  }
+
+  .setting-textarea:focus {
+    outline: none;
+    background: #2c2e33;
+    border-color: #ff922b;
+    box-shadow: 0 0 0 3px rgba(255, 146, 43, 0.1);
+  }
+
+  .setting-hint {
+    margin-top: 6px;
+    font-size: 0.8rem;
+    color: #909296;
+  }
+
+  .privacy-summary {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(255, 146, 43, 0.08);
+    border: 1px dashed rgba(255, 146, 43, 0.4);
+    color: #ffd8a8;
+    font-size: 0.85rem;
+  }
+
+  .privacy-summary i {
+    margin-top: 2px;
   }
   
   .input-suffix {

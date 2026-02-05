@@ -236,6 +236,12 @@
                 </div>
               </div>
             {/if}
+            {#if list.aiSuggestionMeta && (list.aiSuggestedTitle || (list.aiSuggestedTags && list.aiSuggestedTags.length))}
+              <p class="ai-privacy-note">
+                Based on {list.aiSuggestionMeta.allowedCount} of {list.aiSuggestionMeta.totalCount} tabs
+                ({list.aiSuggestionMeta.excludedCount} excluded for privacy)
+              </p>
+            {/if}
           </div>
 
           <!-- Actions (Hidden until hover) -->

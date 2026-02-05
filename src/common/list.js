@@ -40,6 +40,7 @@ export const createNewTabList = ({ _id, tabs, title, tags, category, time, pinne
     updatedAt: updatedAt || resolvedTime,
     aiSuggestedTitle: '',
     aiSuggestedTags: [],
+    aiSuggestionMeta: null,
   }
 }
 

@@ -4,6 +4,7 @@ import listManager from './listManager'
 import { ILLEGAL_URLS } from './constants'
 import { Mutex } from './utils'
 import CustomSync from './service/custom-sync'
+import { filterTabsForPrivacy } from './aiPrivacy'
 
 
 const getAllInWindow = windowId => chrome.tabs.query({ windowId })
@@ -102,15 +103,27 @@ const triggerAiNameSuggestion = (list, opts) => {
   aiSuggestionInflight.add(list._id)
   ;(async () => {
     try {
-      const response = await withTimeout(CustomSync.AI.suggestName(list.tabs), AI_NAME_TIMEOUT_MS)
+      const privacy = filterTabsForPrivacy(list.tabs, opts?.aiExcludedDomains)
+      if (privacy.totalCount === 0) {
+        return
+      }
+      if (privacy.totalCount > 0 && privacy.allowedCount === 0) {
+        return
+      }
+      const response = await withTimeout(CustomSync.AI.suggestName(privacy.allowedTabs), AI_NAME_TIMEOUT_MS)
       const suggestion = normalizeSuggestedTitle(response)
       if (!suggestion) {
         return
       }
       const tags = normalizeSuggestedTags(response)
-      const updates = { aiSuggestedTitle: suggestion }
-      if (tags.length) {
-        updates.aiSuggestedTags = tags
+      const updates = {
+        aiSuggestedTitle: suggestion,
+        aiSuggestionMeta: {
+          allowedCount: privacy.allowedCount,
+          excludedCount: privacy.excludedCount,
+          totalCount: privacy.totalCount,
+        },
+        aiSuggestedTags: tags,
       }
       await listManager.updateListById(list._id, updates)
     } catch (error) {

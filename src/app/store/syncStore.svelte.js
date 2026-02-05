@@ -7,6 +7,7 @@ import { logSyncEvent } from '@/common/sync-logger'
 import tabsHelper from '@/common/tabs'
 import manager from './bridge'
 import _ from 'lodash'
+import { filterTabsForPrivacy } from '@/common/aiPrivacy'
 
 const RETRY_DELAY = 10000
 
@@ -546,14 +547,38 @@ export const syncStore = {
 
     state.aiLoading = list._id
     try {
-      const result = await CustomSync.AI.categorize(list.tabs)
+      const privacy = filterTabsForPrivacy(list.tabs, state.opts?.aiExcludedDomains)
+      if (privacy.totalCount > 0 && privacy.allowedCount === 0) {
+        state.snackbar = {
+          status: true,
+          msg: 'AI disabled: all tabs excluded for privacy',
+          type: 'info',
+        }
+        return null
+      }
+      if (privacy.totalCount === 0) {
+        state.snackbar = {
+          status: true,
+          msg: 'AI unavailable: stash has no tabs',
+          type: 'info',
+        }
+        return null
+      }
+      const result = await CustomSync.AI.categorize(privacy.allowedTabs)
       if (result.category) {
         manager.updateListById(list._id, { category: result.category })
       }
       if (result.tags) {
         manager.updateListById(list._id, { tags: result.tags })
       }
-      return result
+      return {
+        ...result,
+        privacyMeta: {
+          allowedCount: privacy.allowedCount,
+          excludedCount: privacy.excludedCount,
+          totalCount: privacy.totalCount,
+        },
+      }
     } catch (error) {
       console.error('[SquirrlTab] Categorization failed:', error)
       throw error
@@ -587,7 +612,12 @@ export const syncStore = {
     const list = state.lists.find(l => l._id === listId)
     if (!list?.aiSuggestedTitle) return false
     try {
-      await manager.updateListById(listId, { title: list.aiSuggestedTitle, aiSuggestedTitle: '' })
+      const hasRemainingTags = Array.isArray(list.aiSuggestedTags) && list.aiSuggestedTags.length > 0
+      await manager.updateListById(listId, {
+        title: list.aiSuggestedTitle,
+        aiSuggestedTitle: '',
+        aiSuggestionMeta: hasRemainingTags ? list.aiSuggestionMeta : null,
+      })
       state.snackbar = { status: true, msg: 'AI suggestion applied', type: 'success' }
       return true
     } catch (error) {
@@ -600,7 +630,11 @@ export const syncStore = {
     const list = state.lists.find(l => l._id === listId)
     if (!list?.aiSuggestedTitle) return false
     try {
-      await manager.updateListById(listId, { aiSuggestedTitle: '' })
+      const hasRemainingTags = Array.isArray(list.aiSuggestedTags) && list.aiSuggestedTags.length > 0
+      await manager.updateListById(listId, {
+        aiSuggestedTitle: '',
+        aiSuggestionMeta: hasRemainingTags ? list.aiSuggestionMeta : null,
+      })
       return true
     } catch (error) {
       console.error('[SquirrlTab] Failed to reject AI suggestion:', error)
@@ -617,7 +651,12 @@ export const syncStore = {
       const existing = Array.isArray(list.tags) ? list.tags : []
       const merged = Array.from(new Set([...existing, normalizedTag]))
       const remainingSuggestions = removeSuggestedTag(list, normalizedTag)
-      await manager.updateListById(listId, { tags: merged, aiSuggestedTags: remainingSuggestions })
+      const shouldKeepMeta = remainingSuggestions.length > 0 || (list.aiSuggestedTitle && list.aiSuggestedTitle.length > 0)
+      await manager.updateListById(listId, {
+        tags: merged,
+        aiSuggestedTags: remainingSuggestions,
+        aiSuggestionMeta: shouldKeepMeta ? list.aiSuggestionMeta : null,
+      })
       state.snackbar = { status: true, msg: `Tag "${normalizedTag}" added`, type: 'success' }
       return true
     } catch (error) {
@@ -633,7 +672,11 @@ export const syncStore = {
     if (!list?.aiSuggestedTags?.length) return false
     try {
       const remaining = removeSuggestedTag(list, normalizedTag)
-      await manager.updateListById(listId, { aiSuggestedTags: remaining })
+      const shouldKeepMeta = remaining.length > 0 || (list.aiSuggestedTitle && list.aiSuggestedTitle.length > 0)
+      await manager.updateListById(listId, {
+        aiSuggestedTags: remaining,
+        aiSuggestionMeta: shouldKeepMeta ? list.aiSuggestionMeta : null,
+      })
       return true
     } catch (error) {
       console.error('[SquirrlTab] Failed to reject tag suggestion:', error)

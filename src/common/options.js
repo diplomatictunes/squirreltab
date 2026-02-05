@@ -233,6 +233,13 @@ export const getOptionsList = () => [
     new: '1.4.1',
   },
   {
+    cate: cate.BEHAVIOUR,
+    name: 'aiExcludedDomains',
+    type: Array,
+    default: [],
+    new: '1.5.0',
+  },
+  {
     cate: cate.APPEARANCE,
     name: 'enableSearch',
     type: Boolean,

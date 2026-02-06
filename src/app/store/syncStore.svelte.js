@@ -10,6 +10,8 @@ import _ from 'lodash'
 import { filterTabsForPrivacy } from '@/common/aiPrivacy'
 
 const RETRY_DELAY = 10000
+const FATAL_SYNC_CODES = new Set(['auth'])
+const shouldAutoRetry = error => !error || !FATAL_SYNC_CODES.has(error.code)
 
 const getListTimestamp = list => list?.updatedAt || list?.time || 0
 const buildSignature = lists => (lists || []).map(list => `${list._id}:${getListTimestamp(list)}:${list.tabs?.length || 0}`).join('|')
@@ -79,6 +81,8 @@ let state = $state({
   pendingRetry: null,
   duplicateIndex: {},
 })
+
+const isAutoSyncBlocked = () => FATAL_SYNC_CODES.has(state.syncError?.code)
 
 const EMPTY_DUPLICATE_META = Object.freeze({ hasDuplicates: false, count: 0 })
 
@@ -262,7 +266,18 @@ const pushStateToServer = async payload => {
     state.syncError = normalized
     state.localOnly = true
     state.pendingRetry = payload
-    scheduleRetry()
+    if (shouldAutoRetry(normalized)) {
+      scheduleRetry()
+    } else {
+      if (retryTimer) {
+        clearTimeout(retryTimer)
+        retryTimer = null
+      }
+      logSyncEvent('retry_blocked', {
+        code: normalized.code,
+        reason: payload?.reason,
+      })
+    }
     state.snackbar = { status: true, msg: normalized.message, type: 'error' } // Notify error
     logSyncEvent('push_failed', {
       code: normalized.code,
@@ -284,6 +299,7 @@ const debouncedPush = _.debounce(() => {
 
 const scheduleSync = (reason = 'change', { immediate = false, listsOverride = null, signatureOverride = null, force = false } = {}) => {
   if (!state.initialized) return
+  if (!force && isAutoSyncBlocked()) return
   if (!force && !isAutoSyncEnabled(state.opts)) return
   const lists = listsOverride || $state.snapshot(state.lists)
   const signature = signatureOverride || buildSignature(lists)
@@ -462,9 +478,25 @@ browser.storage.onChanged.addListener((changes, area) => {
     reconcileLocalTruth()
   }
   if (changes.opts) {
+    const wasAuthBlocked = isAutoSyncBlocked()
     state.opts = changes.opts.newValue || {}
     console.log('[SquirrlTab] Options updated from storage')
     setupAutoSyncTimer()
+    if (wasAuthBlocked) {
+      state.syncError = null
+      state.syncPhase = SYNC_PHASES.IDLE
+      state.lastSyncSuccess = null
+      if (state.pendingRetry) {
+        scheduleSync('auth-retry', {
+          immediate: true,
+          listsOverride: state.pendingRetry.lists,
+          signatureOverride: state.pendingRetry.signature,
+          force: true,
+        })
+      } else if (isAutoSyncEnabled(state.opts)) {
+        hydrateFromRemote()
+      }
+    }
   }
   if (changes.lastSyncedSignature) {
     state.lastSyncedSignature = changes.lastSyncedSignature.newValue || ''

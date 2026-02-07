@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stashbase Extension Popup</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Syne:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #0066FF;
+            --primary-blue-hover: #0052CC;
+            --bg-white: #FFFFFF;
+            --border-light: #E4E7EB;
+            --text-dark: #1A1D1F;
+            --text-gray: #6F767E;
+            --success-green: #22C55E;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+        }
+
+        .popup-container {
+            background: var(--bg-white);
+            border-radius: 20px;
+            padding: 32px;
+            width: 300px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 28px;
+        }
+
+        .logo {
+            width: 40px;
+            height: 40px;
+            background: var(--text-dark);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            color: white;
+            font-size: 20px;
+        }
+
+        .brand-name {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--text-dark);
+            letter-spacing: -0.02em;
+        }
+
+        .action-button {
+            width: 100%;
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 16px 24px;
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 12px;
+        }
+
+        .action-button:hover {
+            background: var(--primary-blue-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(0, 102, 255, 0.3);
+        }
+
+        .action-button:active {
+            transform: translateY(0);
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-light);
+            font-size: 13px;
+            color: var(--text-gray);
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            background: var(--success-green);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .status-text {
+            font-weight: 500;
+        }
+
+        .ai-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+    </style>
+</head>
+<body>
+    <div class="popup-container">
+        <div class="header">
+            <div class="logo">S</div>
+            <div class="brand-name">Stashbase</div>
+        </div>
+
+        <button class="action-button">Stash This Tab</button>
+        <button class="action-button">Stash All Tabs</button>
+        <button class="action-button">Stash Tabs To The Right</button>
+        <button class="action-button">Open Stash List</button>
+
+        <div class="status">
+            <div class="status-indicator"></div>
+            <span class="status-text">Synced</span>
+            <span>•</span>
+            <span class="ai-badge">AI Enabled</span>
+        </div>
+    </div>
+</body>
+</html>

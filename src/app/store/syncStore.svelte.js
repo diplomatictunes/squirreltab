@@ -757,6 +757,31 @@ export const syncStore = {
       if (!removed) break
     }
   },
+  async restoreAll(listIds = null) {
+    const targets = listIds
+      ? state.lists.filter(l => listIds.includes(l._id))
+      : state.lists
+    if (targets.length === 0) return true
+    try {
+      // Restore sequentially to avoid overlapping browser activities
+      for (const list of targets) {
+        await tabsHelper.restoreTabs(list.tabs)
+        if (!list.pinned) {
+          await manager.removeListById(list._id)
+        }
+      }
+      state.snackbar = {
+        status: true,
+        msg: `Restored ${targets.length} stashes`,
+        type: 'success',
+      }
+      return true
+    } catch (error) {
+      console.error('[SquirrlTab] Bulk restore failed:', error)
+      state.snackbar = { status: true, msg: 'Failed to restore all stashes', type: 'error' }
+      return false
+    }
+  },
 }
 
 browser.runtime.onMessage.addListener(message => {

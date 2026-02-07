@@ -4,12 +4,12 @@
   import CustomSync from "@/common/service/custom-sync";
   import optionsCatalog from "@/common/options";
   import { normalizeDomain } from "@/common/utils";
-  
+
   let { onBack } = $props();
-  
+
   const canonicalOptionKeys = Object.keys(optionsCatalog.getDefaultOptions());
   // Only persist canonical option keys so storage never accrues unsupported drift.
-  const stripUnsupportedOptionKeys = raw => {
+  const stripUnsupportedOptionKeys = (raw) => {
     if (!raw) return {};
     const sanitized = {};
     for (const key of canonicalOptionKeys) {
@@ -19,7 +19,7 @@
     }
     return sanitized;
   };
-  
+
   // Settings state
   let settings = $state({
     syncBaseUrl: "",
@@ -29,17 +29,17 @@
     aiNameSuggestions: false,
     aiExcludedDomainsInput: "",
   });
-  
+
   let saveStatus = $state(null); // "saving" | "success" | "error"
   let testStatus = $state(null); // "testing" | "success" | "error"
   let testMessage = $state("");
-  
+
   // Load settings on mount
   $effect(() => {
     loadSettings();
   });
-  
-  const parseExcludedDomainsInput = raw => {
+
+  const parseExcludedDomainsInput = (raw) => {
     if (typeof raw !== "string") return [];
     const tokens = raw
       .split(/\r?\n/)
@@ -48,7 +48,7 @@
     return Array.from(new Set(tokens));
   };
 
-  const stringifyExcludedDomains = domains => {
+  const stringifyExcludedDomains = (domains) => {
     if (!Array.isArray(domains) || domains.length === 0) return "";
     return domains.join("\n");
   };
@@ -65,7 +65,7 @@
       storedOpts.aiExcludedDomains || [],
     );
   }
-  
+
   async function saveSettings() {
     saveStatus = "saving";
     try {
@@ -78,15 +78,17 @@
         autoSyncEnabled: settings.autoSyncEnabled,
         autoSyncInterval: settings.autoSyncInterval,
         aiNameSuggestions: settings.aiNameSuggestions,
-        aiExcludedDomains: parseExcludedDomainsInput(settings.aiExcludedDomainsInput),
+        aiExcludedDomains: parseExcludedDomainsInput(
+          settings.aiExcludedDomainsInput,
+        ),
       };
-      
+
       await browser.storage.local.set({ opts: updatedOpts });
       saveStatus = "success";
       setTimeout(() => {
         saveStatus = null;
       }, 2000);
-      
+
       syncStore.updateSnackbar("Settings saved successfully");
     } catch (error) {
       console.error("Failed to save settings:", error);
@@ -96,11 +98,11 @@
       }, 3000);
     }
   }
-  
+
   async function testConnection() {
     testStatus = "testing";
     testMessage = "Testing connection...";
-    
+
     try {
       const opts = await browser.storage.local.get("opts");
       const canonicalExisting = stripUnsupportedOptionKeys(opts.opts);
@@ -110,10 +112,14 @@
         syncApiKey: settings.syncApiKey.trim(),
       };
       await browser.storage.local.set({ opts: tempOpts });
-      
+
       const health = await CustomSync.health();
       testStatus = "success";
-      testMessage = "\u2713 Connected to " + (health.service || "sync service") + " v" + (health.version || "?");
+      testMessage =
+        "\u2713 Connected to " +
+        (health.service || "sync service") +
+        " v" +
+        (health.version || "?");
       setTimeout(() => {
         testStatus = null;
         testMessage = "";
@@ -121,7 +127,8 @@
     } catch (error) {
       testStatus = "error";
       if (error.code === "offline") {
-        testMessage = "\u2717 Cannot reach server. Check URL and network connection.";
+        testMessage =
+          "\u2717 Cannot reach server. Check URL and network connection.";
       } else if (error.code === "auth") {
         testMessage = "\u2717 Authentication failed. Check your API key.";
       } else {
@@ -133,7 +140,7 @@
       }, 5000);
     }
   }
-  
+
   function resetToDefaults() {
     const confirmed = confirm("Reset all settings to defaults?");
     if (!confirmed) return;
@@ -147,528 +154,451 @@
   }
 </script>
 
-<div class="settings-view">
-  <header class="settings-header">
-    <button class="back-btn" onclick={onBack}>
-      <i class="fas fa-arrow-left"></i>
-      <span>Back</span>
+<div class="settings-page">
+  <div class="page-header">
+    <button class="back-nav" onclick={onBack}>
+      <span>←</span>
+      Settings
     </button>
-    <h1>Settings</h1>
-  </header>
-  
+  </div>
+
   <div class="settings-content">
-    <!-- Sync Settings Section -->
-    <section class="settings-section">
-      <div class="section-header">
-        <i class="fas fa-sync section-icon"></i>
-        <h2>Sync Configuration</h2>
+    <!-- Sync Configuration Section -->
+    <div class="settings-section">
+      <h2 class="section-title">Sync Configuration</h2>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Sync server URL</div>
+          <input
+            type="text"
+            class="setting-input"
+            bind:value={settings.syncBaseUrl}
+            placeholder="http://localhost:8000"
+          />
+        </div>
       </div>
-      
-      <div class="setting-group">
-        <label for="sync-url" class="setting-label">
-          Sync Server URL
-          <span class="label-hint">The backend service URL for syncing your stashes</span>
-        </label>
-        <input
-          id="sync-url"
-          type="url"
-          class="setting-input"
-          bind:value={settings.syncBaseUrl}
-          placeholder="http://localhost:8000"
-        />
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">API key</div>
+          <input
+            type="password"
+            class="setting-input"
+            bind:value={settings.syncApiKey}
+            placeholder="Enter your API key"
+          />
+        </div>
       </div>
-      
-      <div class="setting-group">
-        <label for="api-key" class="setting-label">
-          API Key
-          <span class="label-hint">Your authentication key for the sync service</span>
-        </label>
-        <input
-          id="api-key"
-          type="password"
-          class="setting-input"
-          bind:value={settings.syncApiKey}
-          placeholder="Enter your API key"
-        />
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Automatic Sync</div>
+          <div class="setting-description">
+            {#if settings.autoSyncEnabled}
+              Syncs every {Math.floor(settings.autoSyncInterval / 60)} minutes
+            {:else}
+              Disabled
+            {/if}
+          </div>
+        </div>
+        <div
+          class="toggle-switch"
+          class:active={settings.autoSyncEnabled}
+          onclick={() => (settings.autoSyncEnabled = !settings.autoSyncEnabled)}
+        ></div>
       </div>
-      
-      <div class="setting-actions">
-        <button 
-          class="test-btn" 
+
+      {#if settings.autoSyncEnabled}
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">Sync Interval (Seconds)</div>
+            <input
+              type="number"
+              class="setting-input small-input"
+              bind:value={settings.autoSyncInterval}
+              min="60"
+              max="3600"
+              step="60"
+            />
+          </div>
+        </div>
+      {/if}
+
+      <div style="margin-top: 16px;">
+        <button
+          class="action-button btn-primary"
           onclick={testConnection}
           disabled={testStatus === "testing"}
         >
-          <i class={`fas ${testStatus === "testing" ? "fa-spinner fa-spin" : "fa-plug"}`}></i>
-          <span>{testStatus === "testing" ? "Testing..." : "Test Connection"}</span>
+          {testStatus === "testing" ? "Testing..." : "Test Connection"}
         </button>
-        
+
         {#if testMessage}
-          <div class="test-result" class:success={testStatus === "success"} class:error={testStatus === "error"}>
+          <div
+            class="test-result"
+            class:success={testStatus === "success"}
+            class:error={testStatus === "error"}
+          >
             {testMessage}
           </div>
         {/if}
       </div>
-      
-      <div class="setting-group">
-        <label class="setting-checkbox">
-          <input
-            type="checkbox"
-            bind:checked={settings.autoSyncEnabled}
-          />
-          <span>Enable automatic sync</span>
-          <span class="checkbox-hint">Automatically sync changes to the server</span>
-        </label>
-      </div>
-      
-      {#if settings.autoSyncEnabled}
-        <div class="setting-group">
-          <label for="sync-interval" class="setting-label">
-            Sync Interval
-            <span class="label-hint">Time between automatic syncs (seconds)</span>
-          </label>
-          <input
-            id="sync-interval"
-            type="number"
-            class="setting-input small"
-            bind:value={settings.autoSyncInterval}
-            min="60"
-            max="3600"
-            step="60"
-          />
-          <span class="input-suffix">{Math.floor(settings.autoSyncInterval / 60)} minutes</span>
+    </div>
+
+    <!-- AI & Privacy Section -->
+    <div class="settings-section">
+      <h2 class="section-title">AI & Privacy</h2>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Enable AI naming suggestions</div>
+          <div class="setting-description">
+            AI-generated list names are optional and only run when enabled
+          </div>
         </div>
-      {/if}
-    </section>
-
-    <!-- AI Privacy Section -->
-    <section class="settings-section">
-      <div class="section-header">
-        <i class="fas fa-user-shield section-icon"></i>
-        <h2>AI Privacy</h2>
+        <div
+          class="toggle-switch"
+          class:active={settings.aiNameSuggestions}
+          onclick={() =>
+            (settings.aiNameSuggestions = !settings.aiNameSuggestions)}
+        ></div>
       </div>
 
-      <div class="setting-group">
-        <label class="setting-checkbox">
-          <input
-            id="ai-name-suggestions"
-            type="checkbox"
-            bind:checked={settings.aiNameSuggestions}
-          />
-          <span>Enable AI naming suggestions</span>
-          <span class="checkbox-hint">
-            AI-generated list names are optional and only run when enabled.
-          </span>
-        </label>
+      <div class="setting-row">
+        <div class="setting-info">
+          <div class="setting-label">Excluded Domains</div>
+          <div class="setting-description">
+            Tabs from these domains will never be shared with AI services
+          </div>
+          <textarea
+            class="setting-input"
+            rows="4"
+            bind:value={settings.aiExcludedDomainsInput}
+            placeholder="example.com&#10;internal.company"
+            style="margin-top: 8px;"
+          ></textarea>
+          <div
+            class="setting-description"
+            style="margin-top: 6px; font-size: 12px;"
+          >
+            Enter one domain per line. Subdomains are also excluded.
+          </div>
+        </div>
       </div>
 
-      <div class="setting-group">
-        <label for="excluded-domains" class="setting-label">
-          Excluded Domains
-          <span class="label-hint">
-            Tabs from these domains will never be shared with AI services.
-          </span>
-        </label>
-        <textarea
-          id="excluded-domains"
-          class="setting-textarea"
-          rows="4"
-          bind:value={settings.aiExcludedDomainsInput}
-          placeholder="example.com&#10;internal.company"
-        ></textarea>
-        <p class="setting-hint">Enter one domain per line. Subdomains are also excluded.</p>
-      </div>
-
-      <div class="privacy-summary">
+      <div class="privacy-note">
         <i class="fas fa-info-circle"></i>
         <span>
           Naming and tagging suggestions will disclose how many tabs were used
           (and how many were excluded for privacy).
         </span>
       </div>
-    </section>
-    
-    <!-- About Section -->
-    <section class="settings-section">
-      <div class="section-header">
-        <i class="fas fa-info-circle section-icon"></i>
-        <h2>About</h2>
+    </div>
+
+    <!-- About / Diagnostics Section -->
+    <div class="settings-section">
+      <h2 class="section-title">About / Diagnostics</h2>
+
+      <div class="diagnostics-box">
+        <div class="diagnostics-title">Extension Version 2025.6.10.04</div>
+        <div class="diagnostics-status">
+          Total Stashes: {syncStore.lists.length}
+        </div>
+        <div class="diagnostics-status">
+          Total Tabs Saved: {syncStore.lists.reduce(
+            (sum, list) => sum + (list.tabs?.length || 0),
+            0,
+          )}
+        </div>
+
+        <div class="diagnostic-actions">
+          <button class="action-button btn-danger" onclick={resetToDefaults}
+            >Reset to Defaults</button
+          >
+          <button
+            class="action-button btn-secondary"
+            onclick={saveSettings}
+            disabled={saveStatus === "saving"}
+          >
+            {#if saveStatus === "saving"}
+              Saving...
+            {:else if saveStatus === "success"}
+              Saved!
+            {:else}
+              Save Settings
+            {/if}
+          </button>
+        </div>
       </div>
-      
-      <div class="about-content">
-        <div class="about-row">
-          <span class="about-label">Extension Version</span>
-          <span class="about-value">2025.6.10.04</span>
-        </div>
-        <div class="about-row">
-          <span class="about-label">Total Stashes</span>
-          <span class="about-value">{syncStore.lists.length}</span>
-        </div>
-        <div class="about-row">
-          <span class="about-label">Total Tabs Saved</span>
-          <span class="about-value">
-            {syncStore.lists.reduce((sum, list) => sum + (list.tabs?.length || 0), 0)}
-          </span>
-        </div>
-      </div>
-    </section>
+    </div>
   </div>
-  
-  <footer class="settings-footer">
-    <button class="reset-btn" onclick={resetToDefaults}>
-      <i class="fas fa-undo"></i>
-      <span>Reset to Defaults</span>
-    </button>
-    
-    <button 
-      class="save-btn" 
-      onclick={saveSettings}
-      disabled={saveStatus === "saving"}
-    >
-      <i class={`fas ${saveStatus === "saving" ? "fa-spinner fa-spin" : "fa-save"}`}></i>
-      <span>
-        {#if saveStatus === "saving"}
-          Saving...
-        {:else if saveStatus === "success"}
-          Saved!
-        {:else}
-          Save Settings
-        {/if}
-      </span>
-    </button>
-  </footer>
 </div>
 
 <style>
-  .settings-view {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: #141517;
+  .settings-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    font-family:
+      "Work Sans",
+      -apple-system,
+      sans-serif;
   }
-  
-  .settings-header {
+
+  .page-header {
+    background: #ffffff;
+    padding: 20px 28px;
+    border-radius: 12px 12px 0 0;
+    border-bottom: 1px solid #e2e8f0;
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 20px 24px;
-    border-bottom: 1px solid #2c2e33;
-    background: #1a1b1e;
+    justify-content: space-between;
   }
-  
-  .back-btn {
+
+  .back-nav {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 14px;
-    background: #25262b;
-    border: 1px solid #2c2e33;
+    gap: 10px;
+    color: #64748b;
+    background: none;
+    border: none;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.2s;
+    padding: 0;
+  }
+
+  .back-nav:hover {
+    color: #0f172a;
+  }
+
+  .settings-content {
+    background: #ffffff;
+    border-radius: 0 0 12px 12px;
+  }
+
+  .settings-section {
+    padding: 28px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .settings-section:last-child {
+    border-bottom: none;
+  }
+
+  .section-title {
+    font-family: "Manrope", sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    color: #0f172a;
+    margin: 0 0 20px 0;
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .setting-row:last-child {
+    border-bottom: none;
+  }
+
+  .setting-info {
+    flex: 1;
+  }
+
+  .setting-label {
+    font-weight: 600;
+    font-size: 14px;
+    color: #0f172a;
+    margin-bottom: 4px;
+  }
+
+  .setting-description {
+    font-size: 13px;
+    color: #64748b;
+  }
+
+  .setting-input {
+    width: 100%;
+    max-width: 400px;
+    padding: 10px 14px;
+    border: 1px solid #e2e8f0;
     border-radius: 8px;
-    color: #c1c2c5;
-    font-size: 0.875rem;
+    font-family: "Work Sans", sans-serif;
+    font-size: 14px;
+    margin-top: 8px;
+    transition: all 0.2s;
+    background: #ffffff;
+    color: #0f172a;
+  }
+
+  .setting-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  .small-input {
+    max-width: 80px;
+    text-align: center;
+  }
+
+  textarea.setting-input {
+    resize: vertical;
+    min-height: 100px;
+    font-family: "Work Sans", sans-serif;
+  }
+
+  .toggle-switch {
+    position: relative;
+    width: 48px;
+    height: 26px;
+    background: #cbd5e1;
+    border-radius: 13px;
+    cursor: pointer;
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+
+  .toggle-switch.active {
+    background: #2563eb;
+  }
+
+  .toggle-switch::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .toggle-switch.active::after {
+    transform: translateX(22px);
+  }
+
+  .action-button {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-family: "Work Sans", sans-serif;
+    font-weight: 600;
+    font-size: 13px;
     cursor: pointer;
     transition: all 0.2s;
+    border: none;
   }
-  
-  .back-btn:hover {
-    background: #2c2e33;
-    color: #e4e4e7;
+
+  .btn-primary {
+    background: #2563eb;
+    color: white;
   }
-  
-  .settings-header h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #e4e4e7;
-    margin: 0;
+
+  .btn-primary:hover:not(:disabled) {
+    background: #1d4ed8;
+    transform: translateY(-1px);
   }
-  
-  .settings-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px;
+
+  .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
-  
-  .settings-section {
-    background: #1a1b1e;
-    border: 1px solid #2c2e33;
-    border-radius: 12px;
-    padding: 24px;
-    margin-bottom: 20px;
+
+  .btn-danger {
+    background: #ef4444;
+    color: white;
   }
-  
-  .section-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 24px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #2c2e33;
+
+  .btn-danger:hover {
+    background: #dc2626;
   }
-  
-  .section-icon {
-    color: #ff922b;
-    font-size: 1.25rem;
+
+  .btn-secondary {
+    background: #f8fafc;
+    color: #0f172a;
+    border: 1px solid #e2e8f0;
   }
-  
-  .section-header h2 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: #e4e4e7;
-    margin: 0;
+
+  .btn-secondary:hover:not(:disabled) {
+    background: #e2e8f0;
   }
-  
-  .setting-group {
-    margin-bottom: 20px;
+
+  .btn-secondary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
-  
-  .setting-group:last-child {
-    margin-bottom: 0;
-  }
-  
-  .setting-label {
-    display: block;
-    font-size: 0.875rem;
+
+  .test-result {
+    display: inline-block;
+    margin-left: 12px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
     font-weight: 500;
-    color: #e4e4e7;
-    margin-bottom: 8px;
-  }
-  
-  .label-hint {
-    display: block;
-    font-size: 0.8125rem;
-    font-weight: 400;
-    color: #909296;
-    margin-top: 4px;
-  }
-  
-  .setting-input,
-  .setting-select {
-    width: 100%;
-    padding: 10px 14px;
-    background: #25262b;
-    border: 1px solid #2c2e33;
-    border-radius: 8px;
-    color: #e4e4e7;
-    font-size: 0.875rem;
-    transition: all 0.2s;
-  }
-  
-  .setting-input:focus,
-  .setting-select:focus {
-    outline: none;
-    background: #2c2e33;
-    border-color: #ff922b;
-    box-shadow: 0 0 0 3px rgba(255, 146, 43, 0.1);
-  }
-  
-  .setting-input.small {
-    width: 120px;
   }
 
-  .setting-textarea {
-    width: 100%;
-    padding: 12px 14px;
-    background: #25262b;
-    border: 1px solid #2c2e33;
-    border-radius: 8px;
-    color: #e4e4e7;
-    font-size: 0.875rem;
-    font-family: inherit;
-    resize: vertical;
-    min-height: 120px;
+  .test-result.success {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
   }
 
-  .setting-textarea:focus {
-    outline: none;
-    background: #2c2e33;
-    border-color: #ff922b;
-    box-shadow: 0 0 0 3px rgba(255, 146, 43, 0.1);
+  .test-result.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
   }
 
-  .setting-hint {
-    margin-top: 6px;
-    font-size: 0.8rem;
-    color: #909296;
-  }
-
-  .privacy-summary {
+  .privacy-note {
     display: flex;
     align-items: flex-start;
     gap: 10px;
     padding: 12px;
     border-radius: 8px;
-    background: rgba(255, 146, 43, 0.08);
-    border: 1px dashed rgba(255, 146, 43, 0.4);
-    color: #ffd8a8;
-    font-size: 0.85rem;
+    background: rgba(37, 99, 235, 0.08);
+    border: 1px dashed rgba(37, 99, 235, 0.3);
+    color: #1e40af;
+    font-size: 13px;
+    margin-top: 16px;
   }
 
-  .privacy-summary i {
+  .privacy-note i {
     margin-top: 2px;
+    color: #2563eb;
   }
-  
-  .input-suffix {
-    margin-left: 12px;
-    font-size: 0.875rem;
-    color: #909296;
-  }
-  
-  .setting-checkbox {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    cursor: pointer;
-    padding: 12px;
+
+  .diagnostics-box {
+    background: #f8fafc;
     border-radius: 8px;
-    transition: background 0.2s;
+    padding: 16px;
   }
-  
-  .setting-checkbox:hover {
-    background: #25262b;
+
+  .diagnostics-title {
+    font-family: "Manrope", sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: #0f172a;
+    margin-bottom: 12px;
   }
-  
-  .setting-checkbox input[type="checkbox"] {
-    margin-top: 2px;
-    cursor: pointer;
+
+  .diagnostics-status {
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 4px;
   }
-  
-  .setting-checkbox > span:first-of-type {
-    flex: 1;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #e4e4e7;
-  }
-  
-  .checkbox-hint {
-    display: block;
-    font-size: 0.8125rem;
-    font-weight: 400;
-    color: #909296;
-    margin-top: 4px;
-  }
-  
-  .setting-actions {
+
+  .diagnostic-actions {
     display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-top: 16px;
-    flex-wrap: wrap;
-  }
-  
-  .test-btn {
-    display: inline-flex;
-    align-items: center;
     gap: 8px;
-    padding: 10px 16px;
-    background: rgba(77, 171, 247, 0.15);
-    border: 1px solid rgba(77, 171, 247, 0.3);
-    border-radius: 8px;
-    color: #4dabf7;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  
-  .test-btn:hover:not(:disabled) {
-    background: rgba(77, 171, 247, 0.25);
-  }
-  
-  .test-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-  
-  .test-result {
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-size: 0.875rem;
-    font-weight: 500;
-  }
-  
-  .test-result.success {
-    background: rgba(64, 192, 87, 0.15);
-    color: #40c057;
-    border: 1px solid rgba(64, 192, 87, 0.3);
-  }
-  
-  .test-result.error {
-    background: rgba(250, 82, 82, 0.15);
-    color: #fa5252;
-    border: 1px solid rgba(250, 82, 82, 0.3);
-  }
-  
-  .about-content {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  
-  .about-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px;
-    background: #25262b;
-    border-radius: 8px;
-  }
-  
-  .about-label {
-    font-size: 0.875rem;
-    color: #909296;
-  }
-  
-  .about-value {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #e4e4e7;
-  }
-  
-  .settings-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 24px;
-    border-top: 1px solid #2c2e33;
-    background: #1a1b1e;
-  }
-  
-  .reset-btn,
-  .save-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 18px;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  
-  .reset-btn {
-    background: transparent;
-    border: 1px solid #2c2e33;
-    color: #909296;
-  }
-  
-  .reset-btn:hover {
-    background: #25262b;
-    color: #c1c2c5;
-  }
-  
-  .save-btn {
-    background: linear-gradient(135deg, #ff922b 0%, #ff6b35 100%);
-    border: none;
-    color: #ffffff;
-  }
-  
-  .save-btn:hover:not(:disabled) {
-    box-shadow: 0 4px 12px rgba(255, 146, 43, 0.4);
-    transform: translateY(-1px);
-  }
-  
-  .save-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+    margin-top: 12px;
   }
 </style>

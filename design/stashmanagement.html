@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Back to All Slashes - Stashbase</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Archivo:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #3B82F6;
+            --bg-gray: #F9FAFB;
+            --bg-white: #FFFFFF;
+            --border: #E5E7EB;
+            --text-dark: #111827;
+            --text-gray: #6B7280;
+            --text-light: #9CA3AF;
+            --hover-bg: #F3F4F6;
+            --accent-orange: #F97316;
+            --accent-blue: #3B82F6;
+            --accent-pink: #EC4899;
+            --accent-green: #10B981;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-gray);
+            min-height: 100vh;
+            padding: 40px;
+        }
+
+        .page-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: var(--bg-white);
+            border-radius: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 24px 28px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .back-button {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-gray);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .back-button:hover {
+            color: var(--text-dark);
+        }
+
+        .back-arrow {
+            font-size: 18px;
+        }
+
+        .spread-button {
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .spread-button:hover {
+            background: #2563EB;
+            transform: translateY(-1px);
+        }
+
+        .search-box {
+            padding: 20px 28px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 16px 10px 40px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%239CA3AF" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>');
+            background-repeat: no-repeat;
+            background-position: 12px center;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .slashes-grid {
+            padding: 20px 28px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .slash-card {
+            background: var(--bg-white);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .slash-card:hover {
+            background: var(--hover-bg);
+            border-color: var(--text-light);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .slash-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .slash-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .slash-icon.dark {
+            background: var(--text-dark);
+            color: white;
+        }
+
+        .slash-icon.orange {
+            background: var(--accent-orange);
+            color: white;
+        }
+
+        .slash-icon.blue {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .slash-icon.pink {
+            background: var(--accent-pink);
+            color: white;
+        }
+
+        .slash-icon.green {
+            background: var(--accent-green);
+            color: white;
+        }
+
+        .slash-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-dark);
+            flex: 1;
+        }
+
+        .slash-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text-gray);
+        }
+
+        .slash-count {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .slash-date {
+            font-size: 11px;
+            color: var(--text-light);
+            margin-top: 4px;
+        }
+
+        .section-title {
+            font-family: 'Archivo', sans-serif;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-gray);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 24px 28px 12px;
+        }
+
+        .footer-actions {
+            padding: 20px 28px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+        }
+
+        .footer-button {
+            background: var(--bg-white);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-gray);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .footer-button:hover {
+            background: var(--hover-bg);
+            border-color: var(--text-gray);
+        }
+
+        .footer-button svg {
+            width: 16px;
+            height: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <div class="header">
+            <a href="#" class="back-button">
+                <span class="back-arrow">←</span>
+                Back to All Slashes
+            </a>
+            <button class="spread-button">Spread</button>
+        </div>
+
+        <div class="search-box">
+            <input type="text" class="search-input" placeholder="Search">
+        </div>
+
+        <div class="slashes-grid">
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon dark">📁</div>
+                    <div class="slash-title">Project Nisha</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 15 Stashes</span>
+                </div>
+                <div class="slash-date">Last load 16h ago</div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon dark">📁</div>
+                    <div class="slash-title">Project Alpha</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 12 Stashes</span>
+                </div>
+                <div class="slash-date">Last load 6h ago</div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon orange">📋</div>
+                    <div class="slash-title">Frameworks || Immersion</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 20+ Tabs</span>
+                </div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon dark">👤</div>
+                    <div class="slash-title">Proteins (Ideas research)</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 1000+</span>
+                </div>
+                <div class="slash-date">In queue 6h ago</div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon dark">📁</div>
+                    <div class="slash-title">Weekend Getaway Ideas</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">🌐 Netlify</span>
+                </div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon dark">🔍</div>
+                    <div class="slash-title">Exported Alpha</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 12 Stashes</span>
+                </div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon dark">📁</div>
+                    <div class="slash-title">Woodland Workflow Resources</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 32 Tabs</span>
+                </div>
+                <div class="slash-date">In later 6h ago</div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon dark">📁</div>
+                    <div class="slash-title">Weekend Getaway Ideas (2 Stashes)</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 12 Stashes</span>
+                </div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon orange">🏃</div>
+                    <div class="slash-title">Health Fitness</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 8 Stashes</span>
+                </div>
+                <div class="slash-date">Syncing...</div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon dark">📁</div>
+                    <div class="slash-title">Haunted Spooky lakes (3 Stashes)</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">🌐 Netlify</span>
+                </div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon blue">📘</div>
+                    <div class="slash-title">Personal Research (Note0123)</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 8 Tabs</span>
+                </div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon pink">❤️</div>
+                    <div class="slash-title">Projects All (Homevideos)</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 Videos</span>
+                </div>
+                <div class="slash-date">Last load 4/03/2025</div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon blue">📊</div>
+                    <div class="slash-title">Presults Alt (Homevideos11)</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 Resources</span>
+                </div>
+                <div class="slash-date">Last load two (even1) 13520</div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon pink">💗</div>
+                    <div class="slash-title">Projects++ (Homevideos)</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 Resources</span>
+                </div>
+                <div class="slash-date">Last load Sixes 4/03/25500</div>
+            </div>
+        </div>
+
+        <div class="section-title">Fresh Names: Ate Titles 8+triggers</div>
+
+        <div class="slashes-grid">
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon dark">📁</div>
+                    <div class="slash-title">Project Gnee(Viles (3 Stashes)</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 First +Share</span>
+                </div>
+            </div>
+
+            <div class="slash-card">
+                <div class="slash-header">
+                    <div class="slash-icon blue">📁</div>
+                    <div class="slash-title">Project Alpha</div>
+                </div>
+                <div class="slash-meta">
+                    <span class="slash-count">📄 12 Stashes</span>
+                </div>
+                <div class="slash-date">MoreSource() 1245</div>
+            </div>
+        </div>
+
+        <div class="footer-actions">
+            <button class="footer-button">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Restore All
+            </button>
+            <button class="footer-button">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Rename
+            </button>
+            <button class="footer-button">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                Add Tag
+            </button>
+            <button class="footer-button">
+                <span>Add Tag</span>
+                <label style="margin-left: auto; display: flex; align-items: center;">
+                    <input type="checkbox" style="width: 36px; height: 20px;">
+                </label>
+            </button>
+        </div>
+    </div>
+</body>
+</html>

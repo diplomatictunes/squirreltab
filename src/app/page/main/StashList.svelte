@@ -101,6 +101,13 @@
     if (!list) return;
     await syncStore.rejectSuggestedTag(list._id, tag);
   }
+
+  async function handleRestoreAll() {
+    if (visibleLists.length === 0) return;
+    if (!confirm(`Restore all ${visibleLists.length} visible stashes?`)) return;
+    const ids = visibleLists.map((l) => l._id);
+    await syncStore.restoreAll(ids);
+  }
 </script>
 
 <div class="page-container">
@@ -108,7 +115,7 @@
   <div class="header">
     <button class="back-button" disabled title="Coming soon">
       <span class="back-arrow">←</span>
-      Back to All Slashes
+      Back to All Stashes
     </button>
     <button class="spread-button" disabled title="Coming soon">Spread</button>
   </div>
@@ -129,7 +136,7 @@
   {/if}
 
   <!-- Stashes grid -->
-  <div class="slashes-grid">
+  <div class="stashes-grid">
     {#if visibleLists.length === 0}
       <div class="empty-state" transition:fade>
         <span>No stashes found</span>
@@ -140,12 +147,12 @@
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
-        class="slash-card"
+        class="stash-card"
         class:expanded={expandedLists.has(list._id)}
         onclick={(e) => handleStashClick(e, list._id)}
       >
-        <div class="slash-header">
-          <div class="slash-icon dark">
+        <div class="stash-header">
+          <div class="stash-icon dark">
             {#if list.pinned}
               📌
             {:else}
@@ -154,18 +161,18 @@
           </div>
           <input
             type="text"
-            class="slash-title"
+            class="stash-title"
             value={list.title || "Untitled Stash"}
             onblur={(e) => updateTitle(list, e.target.value)}
             onclick={(e) => e.stopPropagation()}
           />
         </div>
 
-        <div class="slash-meta">
-          <span class="slash-count">📄 {list.tabs?.length || 0} tabs</span>
+        <div class="stash-meta">
+          <span class="stash-count">📄 {list.tabs?.length || 0} tabs</span>
         </div>
 
-        <div class="slash-date">
+        <div class="stash-date">
           {new Date(list.time).toLocaleDateString(undefined, {
             month: "short",
             day: "numeric",
@@ -174,7 +181,7 @@
         </div>
 
         {#if list.tags && list.tags.length}
-          <div class="slash-tags">
+          <div class="stash-tags">
             {#each list.tags as tag}
               <span class="tag-chip">#{tag}</span>
             {/each}
@@ -192,7 +199,7 @@
 
         {#if list.aiSuggestedTitle}
           <div
-            class="slash-ai-row"
+            class="stash-ai-row"
             onclick={(event) => event.stopPropagation()}
           >
             <div class="ai-icon" title="AI Suggestion">✨</div>
@@ -223,7 +230,7 @@
 
         {#if list.aiSuggestedTags && list.aiSuggestedTags.length}
           <div
-            class="slash-ai-row"
+            class="stash-ai-row"
             onclick={(event) => event.stopPropagation()}
           >
             <div class="ai-icon" title="AI Suggested Tags">✨</div>
@@ -263,7 +270,6 @@
           </p>
         {/if}
 
-        <!-- Card actions on hover -->
         <div class="card-actions">
           <button
             class="icon-btn"
@@ -337,7 +343,11 @@
 
   <!-- Footer actions -->
   <div class="footer-actions">
-    <button class="footer-button" disabled title="Coming soon">
+    <button
+      class="footer-button"
+      onclick={handleRestoreAll}
+      disabled={visibleLists.length === 0}
+    >
       <svg
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
@@ -543,7 +553,7 @@
   }
 
   /* Stashes Grid */
-  .slashes-grid {
+  .stashes-grid {
     max-width: 800px;
     margin: 0 auto;
     padding: 20px 28px;
@@ -561,8 +571,8 @@
     font-size: 14px;
   }
 
-  /* Slash Card */
-  .slash-card {
+  /* stash Card */
+  .stash-card {
     background: var(--bg-gray);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -572,25 +582,25 @@
     position: relative;
   }
 
-  .slash-card:hover {
+  .stash-card:hover {
     background: var(--hover-bg);
     border-color: var(--text-light);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 
-  .slash-card.expanded {
+  .stash-card.expanded {
     background: var(--hover-bg);
   }
 
-  .slash-header {
+  .stash-header {
     display: flex;
     align-items: center;
     gap: 10px;
     margin-bottom: 8px;
   }
 
-  .slash-icon {
+  .stash-icon {
     width: 28px;
     height: 28px;
     border-radius: 6px;
@@ -602,11 +612,11 @@
     background: var(--text-dark);
   }
 
-  .slash-icon.dark {
+  .stash-icon.dark {
     background: var(--text-gray);
   }
 
-  .slash-title {
+  .stash-title {
     font-size: 14px;
     font-weight: 600;
     color: var(--text-dark);
@@ -618,12 +628,12 @@
     cursor: text;
   }
 
-  .slash-title:hover {
+  .stash-title:hover {
     text-decoration: underline;
     text-decoration-color: var(--text-light);
   }
 
-  .slash-meta {
+  .stash-meta {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -632,19 +642,19 @@
     margin-bottom: 4px;
   }
 
-  .slash-count {
+  .stash-count {
     display: flex;
     align-items: center;
     gap: 4px;
   }
 
-  .slash-date {
+  .stash-date {
     font-size: 11px;
     color: var(--text-light);
     margin-top: 4px;
   }
 
-  .slash-tags {
+  .stash-tags {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
@@ -678,8 +688,8 @@
     transition: all 0.2s ease;
   }
 
-  .slash-card:hover .card-actions,
-  .slash-card:focus-within .card-actions {
+  .stash-card:hover .card-actions,
+  .stash-card:focus-within .card-actions {
     opacity: 1;
     transform: translateX(0);
   }
@@ -823,7 +833,7 @@
   }
 
   /* AI Suggestions Refined */
-  .slash-ai-row {
+  .stash-ai-row {
     display: flex;
     align-items: flex-start;
     gap: 10px;
@@ -967,7 +977,7 @@
       padding: 20px;
     }
 
-    .slashes-grid {
+    .stashes-grid {
       grid-template-columns: 1fr;
     }
 

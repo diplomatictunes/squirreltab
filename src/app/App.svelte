@@ -1,5 +1,5 @@
 <script>
-  import "./index.css";
+  //  import "./index.css";
   import { onMount } from "svelte";
   import { isPopupContext } from "@/common/runtimeContext";
   import Popup from "./page/popup/Popup.svelte";

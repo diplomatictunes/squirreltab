@@ -101,39 +101,39 @@ const triggerAiNameSuggestion = (list, opts) => {
   if (!Array.isArray(list.tabs) || list.tabs.length === 0) return
   if (aiSuggestionInflight.has(list._id)) return
   aiSuggestionInflight.add(list._id)
-  ;(async () => {
-    try {
-      const privacy = filterTabsForPrivacy(list.tabs, opts?.aiExcludedDomains)
-      if (privacy.totalCount === 0) {
-        return
+    ; (async () => {
+      try {
+        const privacy = filterTabsForPrivacy(list.tabs, opts?.aiExcludedDomains)
+        if (privacy.totalCount === 0) {
+          return
+        }
+        if (privacy.totalCount > 0 && privacy.allowedCount === 0) {
+          return
+        }
+        const response = await withTimeout(CustomSync.AI.suggestName(privacy.allowedTabs), AI_NAME_TIMEOUT_MS)
+        const suggestion = normalizeSuggestedTitle(response)
+        if (!suggestion) {
+          return
+        }
+        const tags = normalizeSuggestedTags(response)
+        const updates = {
+          aiSuggestedTitle: suggestion,
+          aiSuggestionMeta: {
+            allowedCount: privacy.allowedCount,
+            excludedCount: privacy.excludedCount,
+            totalCount: privacy.totalCount,
+          },
+          aiSuggestedTags: tags,
+        }
+        await listManager.updateListById(list._id, updates)
+      } catch (error) {
+        if (error?.message !== 'AI_SUGGEST_TIMEOUT') {
+          console.warn('[SquirrlTab] Failed to fetch AI name suggestion', error)
+        }
+      } finally {
+        aiSuggestionInflight.delete(list._id)
       }
-      if (privacy.totalCount > 0 && privacy.allowedCount === 0) {
-        return
-      }
-      const response = await withTimeout(CustomSync.AI.suggestName(privacy.allowedTabs), AI_NAME_TIMEOUT_MS)
-      const suggestion = normalizeSuggestedTitle(response)
-      if (!suggestion) {
-        return
-      }
-      const tags = normalizeSuggestedTags(response)
-      const updates = {
-        aiSuggestedTitle: suggestion,
-        aiSuggestionMeta: {
-          allowedCount: privacy.allowedCount,
-          excludedCount: privacy.excludedCount,
-          totalCount: privacy.totalCount,
-        },
-        aiSuggestedTags: tags,
-      }
-      await listManager.updateListById(list._id, updates)
-    } catch (error) {
-      if (error?.message !== 'AI_SUGGEST_TIMEOUT') {
-        console.warn('[SquirrlTab] Failed to fetch AI name suggestion', error)
-      }
-    } finally {
-      aiSuggestionInflight.delete(list._id)
-    }
-  })()
+    })()
 }
 const storeTabs = async (tabs, listIndex) => {
   const appUrl = chrome.runtime.getURL('')
@@ -197,6 +197,18 @@ const storeAllTabs = async listIndex => {
   return storeTabs(tabs, listIndex)
 }
 
+const storeExceptCurrentTab = async listIndex => {
+  const allTabs = await getAllTabsInCurrentWindow()
+  const otherTabs = allTabs.filter(t => !t.active)
+  return storeTabs(otherTabs, listIndex)
+}
+
+const storeExceptSelectedTabs = async listIndex => {
+  const allTabs = await getAllTabsInCurrentWindow()
+  const otherTabs = allTabs.filter(t => !t.highlighted)
+  return storeTabs(otherTabs, listIndex)
+}
+
 const storeAllTabInAllWindows = async () => {
   const windows = await chrome.windows.getAll()
   const opts = await storage.getOptions()
@@ -253,10 +265,12 @@ export default {
   storeLeftTabs,
   storeRightTabs,
   storeSelectedTabs,
+  storeExceptSelectedTabs,
   storeTwoSideTabs,
   storeAllTabs,
   storeAllTabInAllWindows,
   storeCurrentTab,
+  storeExceptCurrentTab,
   storeTabs,
   restoreTabs,
   restoreList,

@@ -29,6 +29,29 @@
       window.close();
     } catch (e) {
       console.error(e);
+    } finally {
+      isStashing = false;
+    }
+  }
+
+  async function handleStashSelected() {
+    isStashing = true;
+    try {
+      await tabs.storeSelectedTabs();
+      window.close();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      isStashing = false;
+    }
+  }
+
+  async function handleStashLeft() {
+    try {
+      await tabs.storeLeftTabs();
+      window.close();
+    } catch (e) {
+      console.error(e);
     }
   }
 
@@ -36,15 +59,37 @@
     try {
       await tabs.storeRightTabs();
       window.close();
-    } catch (e) {}
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function handleStashExceptCurrent() {
+    isStashing = true;
+    try {
+      await tabs.storeExceptCurrentTab();
+      window.close();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      isStashing = false;
+    }
+  }
+
+  async function handleStashExceptSelected() {
+    isStashing = true;
+    try {
+      await tabs.storeExceptSelectedTabs();
+      window.close();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      isStashing = false;
+    }
   }
 
   function openStashList() {
     tabs.openlists();
-  }
-
-  function openSettings() {
-    chrome.runtime.openOptionsPage();
   }
 </script>
 
@@ -54,22 +99,63 @@
     <div class="brand-name">Stashbase</div>
   </div>
 
-  <button
-    class="action-button"
-    onclick={handleStashCurrent}
-    disabled={isStashing}
-  >
-    Stash This Tab
-  </button>
-  <button class="action-button" onclick={handleStashAll}>
-    Stash All Tabs
-  </button>
-  <button class="action-button" onclick={handleStashRight}>
-    Stash Tabs To The Right
-  </button>
-  <button class="action-button" onclick={openStashList}>
-    Open Stash List
-  </button>
+  <div class="actions">
+    <button
+      class="action-button primary"
+      onclick={handleStashCurrent}
+      disabled={isStashing}
+    >
+      Stash This Tab
+    </button>
+    <button class="action-button primary" onclick={handleStashAll}>
+      Stash All Tabs
+    </button>
+
+    <div class="action-grid">
+      <button
+        class="action-button secondary"
+        onclick={handleStashSelected}
+        title="Stash selected tabs"
+      >
+        Selected
+      </button>
+      <button
+        class="action-button secondary"
+        onclick={handleStashLeft}
+        title="Stash tabs to the left"
+      >
+        Left
+      </button>
+      <button
+        class="action-button secondary"
+        onclick={handleStashRight}
+        title="Stash tabs to the right"
+      >
+        Right
+      </button>
+      <button
+        class="action-button secondary"
+        onclick={handleStashExceptCurrent}
+        title="Stash all except current"
+      >
+        Not Current
+      </button>
+      <button
+        class="action-button secondary"
+        onclick={handleStashExceptSelected}
+        title="Stash all except selected"
+      >
+        Not Selected
+      </button>
+      <button
+        class="action-button secondary list-link"
+        onclick={openStashList}
+        title="Open your lists"
+      >
+        My Lists
+      </button>
+    </div>
+  </div>
 
   <div class="status">
     <SyncStatusBadge />
@@ -189,10 +275,51 @@
     margin-bottom: 12px;
   }
 
-  .action-button:hover {
+  .action-button:hover:not(:disabled) {
     background: var(--primary-blue-hover);
     transform: translateY(-1px);
     box-shadow: 0 6px 20px rgba(0, 102, 255, 0.3);
+  }
+
+  .action-button.secondary {
+    background: #f1f5f9;
+    color: var(--text-dark);
+    padding: 12px 16px;
+    font-size: 13px;
+    margin-bottom: 0;
+    box-shadow: none;
+    border: 1px solid var(--border-light);
+  }
+
+  .action-button.secondary:hover:not(:disabled) {
+    background: #e2e8f0;
+    transform: none;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .action-button.list-link {
+    grid-column: span 2;
+    background: var(--text-dark);
+    color: white;
+    margin-top: 4px;
+    border: none;
+  }
+
+  .action-button.list-link:hover:not(:disabled) {
+    background: #2d2d2d;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .action-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .actions {
+    display: flex;
+    flex-direction: column;
   }
 
   .action-button:active {

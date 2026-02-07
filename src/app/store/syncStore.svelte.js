@@ -247,7 +247,12 @@ const pushStateToServer = async payload => {
     state.pendingRetry = null
     pendingPayload = null
     state.lastSyncedSignature = payload.signature
+
+    // Keep version/signature reconciliation as the single “truth” authority,
+    // but also record explicit success metadata for UI/diagnostics.
     finalizeSignatureAlignment({ remoteVersionOverride: remoteVersion })
+    state.remoteVersion = remoteVersion
+
     browser.storage.local.set({ lastSyncedSignature: payload.signature }) // Persist signature
     logSyncEvent('push_success', {
       listCount: payload.lists?.length || 0,
@@ -390,7 +395,7 @@ const hydrateFromRemote = async () => {
     state.localOnly = true
 
     // FORCE LOCAL DATA TO PERSIST
-    // This prevents the UI from clearing or hiding the lists 
+    // This prevents the UI from clearing or hiding the lists
     // just because the server at localhost:8000 is down.
     if (state.lists.length === 0) {
       const data = await browser.storage.local.get('lists')
@@ -512,7 +517,6 @@ $effect.root(() => {
     scheduleSync('change', { listsOverride: snapshot, signatureOverride: signature })
   })
 })
-
 
 export const syncStore = {
   get lists() {

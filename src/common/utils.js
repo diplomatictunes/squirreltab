@@ -173,3 +173,14 @@ export const getDomain = (url) => {
     return url;
   }
 };
+
+export const normalizeDomain = value => {
+  if (typeof value !== 'string') return ''
+  let normalized = value.trim().toLowerCase()
+  if (!normalized) return ''
+  normalized = normalized.replace(/^[a-z]+:\/\//, '')
+  normalized = normalized.replace(/\/.*$/, '')
+  normalized = normalized.replace(/^\./, '')
+  normalized = normalized.replace(/^www\./, '')
+  return normalized
+}

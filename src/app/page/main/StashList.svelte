@@ -14,6 +14,7 @@
   // Lists from store
   let lists = $derived(syncStore.lists);
   let pinnedLists = $derived(syncStore.pinnedLists);
+  let duplicateIndex = $derived(syncStore.duplicates);
 
   // Simple search filter
   const matchFilter = (list) => {
@@ -55,9 +56,9 @@
     await syncStore.restoreList(list._id, false);
   }
 
-  function handleDelete(list) {
+  async function handleDelete(list) {
     if (!confirm("Delete stash?")) return;
-    syncStore.removeList(list._id);
+    await syncStore.removeList(list._id);
   }
 
   function togglePin(list) {
@@ -70,8 +71,35 @@
     else syncStore.updateList(list._id, { tabs: updatedTabs });
   }
 
+  const duplicateMeta = (listId) =>
+    duplicateIndex[listId] || { hasDuplicates: false, count: 0 };
+
   function updateTitle(list, newTitle) {
     syncStore.updateList(list._id, { title: newTitle });
+  }
+
+  async function acceptAiName(list, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.acceptAiSuggestion(list._id);
+  }
+
+  async function rejectAiName(list, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.rejectAiSuggestion(list._id);
+  }
+
+  async function acceptSuggestedTag(list, tag, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.acceptSuggestedTag(list._id, tag);
+  }
+
+  async function rejectSuggestedTag(list, tag, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.rejectSuggestedTag(list._id, tag);
   }
 </script>
 
@@ -139,7 +167,81 @@
                   {/each}
                 </span>
               {/if}
+              {#if duplicateMeta(list._id).hasDuplicates}
+                <span class="separator">·</span>
+                <span
+                  class="duplicate-indicator"
+                  title="This stash shares URLs with other stashes"
+                >
+                  <span class="duplicate-dot" aria-hidden="true"></span>
+                  Duplicates {duplicateMeta(list._id).count}
+                </span>
+              {/if}
             </div>
+            {#if list.aiSuggestedTitle}
+              <div
+                class="ai-name-suggestion compact"
+                onclick={(event) => event.stopPropagation()}
+              >
+                <div class="ai-suggestion-body">
+                  <span class="ai-chip">Suggested</span>
+                  <span class="ai-value">{list.aiSuggestedTitle}</span>
+                </div>
+                <div class="ai-suggestion-actions">
+                  <button
+                    class="ai-btn"
+                    type="button"
+                    onclick={(event) => acceptAiName(list, event)}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    class="ai-btn ghost"
+                    type="button"
+                    onclick={(event) => rejectAiName(list, event)}
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            {/if}
+            {#if list.aiSuggestedTags && list.aiSuggestedTags.length}
+              <div
+                class="ai-tag-suggestions compact"
+                onclick={(event) => event.stopPropagation()}
+              >
+                <span class="ai-chip">Suggested tags</span>
+                <div class="ai-tag-list">
+                  {#each list.aiSuggestedTags as tag}
+                    <div class="ai-tag-chip">
+                      <span class="tag-label">#{tag}</span>
+                      <div class="ai-tag-actions">
+                        <button
+                          class="ai-tag-btn"
+                          type="button"
+                          onclick={(event) => acceptSuggestedTag(list, tag, event)}
+                        >
+                          Add
+                        </button>
+                        <button
+                          class="ai-tag-btn ghost"
+                          type="button"
+                          onclick={(event) => rejectSuggestedTag(list, tag, event)}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+            {#if list.aiSuggestionMeta && (list.aiSuggestedTitle || (list.aiSuggestedTags && list.aiSuggestedTags.length))}
+              <p class="ai-privacy-note">
+                Based on {list.aiSuggestionMeta.allowedCount} of {list.aiSuggestionMeta.totalCount} tabs
+                ({list.aiSuggestionMeta.excludedCount} excluded for privacy)
+              </p>
+            {/if}
           </div>
 
           <!-- Actions (Hidden until hover) -->

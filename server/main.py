@@ -24,7 +24,7 @@ app = FastAPI(title="SquirrlTab Sync API", version="2.0.0")
 from fastapi.middleware.cors import CORSMiddleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=".*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,24 +69,21 @@ def dt_to_epoch_ms(value: Optional[datetime.datetime]) -> Optional[int]:
         return None
     return int(value.timestamp() * 1000)
 
-# FIXED: Auth Dependency using api_key instead of username
-def get_user_by_api_key(api_key: str = Security(api_key_header), db: Session = Depends(get_db)):
+# Enhanced authentication function with better logging
+# Replace the get_user_by_api_key function in server/main.py with this version
+def get_user_by_api_key(
+    api_key: str = Security(api_key_header),
+    db: Session = Depends(get_db)
+):
     if not api_key:
-        logger.warning("No API key provided, checking for default development user")
-        user = db.query(User).filter(User.api_key == "dev-key-12345").first()
-        if not user:
-            user = User(api_key="dev-key-12345")
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-            logger.info("Created default development user")
-        return user
-    
+        raise HTTPException(status_code=403, detail="Missing API key")
+
     user = db.query(User).filter(User.api_key == api_key).first()
     if not user:
-        raise HTTPException(status_code=403, detail="Could not validate credentials")
-    return user
+        raise HTTPException(status_code=403, detail="Invalid API key")
 
+    return user
+    
 @app.on_event("startup")
 def startup_event():
     init_db()

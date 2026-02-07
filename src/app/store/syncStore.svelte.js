@@ -7,8 +7,11 @@ import { logSyncEvent } from '@/common/sync-logger'
 import tabsHelper from '@/common/tabs'
 import manager from './bridge'
 import _ from 'lodash'
+import { filterTabsForPrivacy } from '@/common/aiPrivacy'
 
 const RETRY_DELAY = 10000
+const FATAL_SYNC_CODES = new Set(['auth'])
+const shouldAutoRetry = error => !error || !FATAL_SYNC_CODES.has(error.code)
 
 const getListTimestamp = list => list?.updatedAt || list?.time || 0
 const buildSignature = lists => (lists || []).map(list => `${list._id}:${getListTimestamp(list)}:${list.tabs?.length || 0}`).join('|')
@@ -66,7 +69,7 @@ let state = $state({
   opts: {},
   aiLoading: null,
   syncing: false,
-  snackbar: { status: false, msg: '' },
+  snackbar: { status: false, msg: '', type: 'info' }, // Added type
   initialized: false,
   lastSyncSuccess: null,
   syncPhase: SYNC_PHASES.NEVER_SYNCED,
@@ -76,12 +79,110 @@ let state = $state({
   lastSyncedSignature: '',
   remoteVersion: 0,
   pendingRetry: null,
+  duplicateIndex: {},
 })
+
+const isAutoSyncBlocked = () => FATAL_SYNC_CODES.has(state.syncError?.code)
+
+const EMPTY_DUPLICATE_META = Object.freeze({ hasDuplicates: false, count: 0 })
+
+const buildDuplicateIndex = lists => {
+  if (!Array.isArray(lists) || lists.length === 0) return {}
+  const urlOwners = new Map()
+  lists.forEach(list => {
+    if (!list || !Array.isArray(list.tabs)) return
+    const seenUrls = new Set()
+    list.tabs.forEach(tab => {
+      const url = tab?.url
+      if (!url || seenUrls.has(url)) return
+      seenUrls.add(url)
+      if (!urlOwners.has(url)) urlOwners.set(url, new Set())
+      urlOwners.get(url).add(list._id)
+    })
+  })
+  const duplicateIndex = {}
+  lists.forEach(list => {
+    if (!list || !Array.isArray(list.tabs)) return
+    let count = 0
+    const countedUrls = new Set()
+    list.tabs.forEach(tab => {
+      const url = tab?.url
+      if (!url || countedUrls.has(url)) return
+      countedUrls.add(url)
+      const owners = urlOwners.get(url)
+      if (owners && owners.size > 1) {
+        count += 1
+      }
+    })
+    duplicateIndex[list._id] = {
+      hasDuplicates: count > 0,
+      count,
+    }
+  })
+  return duplicateIndex
+}
+
+const REFLECTIVE_PHASES = new Set([
+  SYNC_PHASES.SYNCED,
+  SYNC_PHASES.LOCAL_ONLY,
+  SYNC_PHASES.IDLE,
+  SYNC_PHASES.NEVER_SYNCED,
+])
+
+const reconcileLocalTruth = ({ remoteVersionOverride } = {}) => {
+  const resolvedRemoteVersion = typeof remoteVersionOverride === 'number'
+    ? remoteVersionOverride
+    : computeVersion(state.lists)
+  state.remoteVersion = resolvedRemoteVersion
+  const signature = buildSignature(state.lists)
+  if (!state.initialized) {
+    state.duplicateIndex = buildDuplicateIndex(state.lists)
+    return { signature, inSync: false }
+  }
+  const inSync = signature === state.lastSyncedSignature
+  state.localOnly = !inSync
+  if (!state.syncing && !state.pendingRetry && REFLECTIVE_PHASES.has(state.syncPhase)) {
+    state.syncPhase = inSync ? SYNC_PHASES.SYNCED : SYNC_PHASES.LOCAL_ONLY
+  }
+  state.duplicateIndex = buildDuplicateIndex(state.lists)
+  return { signature, inSync }
+}
+
+const finalizeSignatureAlignment = ({ remoteVersionOverride } = {}) => {
+  const { inSync } = reconcileLocalTruth({ remoteVersionOverride })
+  if (state.initialized && inSync) {
+    state.lastSyncedAt = Date.now()
+    state.lastSyncSuccess = true
+  }
+}
+
+const removeListSafely = async listId => {
+  try {
+    await manager.removeListById(listId)
+    return true
+  } catch (error) {
+    console.error('[SquirrlTab] Failed to remove list:', error)
+    state.snackbar = { status: true, msg: 'Unable to delete stash', type: 'error' }
+    return false
+  }
+}
 
 const waitForNextTick = () => new Promise(resolve => {
   if (typeof queueMicrotask === 'function') queueMicrotask(resolve)
   else setTimeout(resolve, 0)
 })
+
+const normalizeTagValue = tag => {
+  if (typeof tag !== 'string') return ''
+  const trimmed = tag.trim()
+  if (!trimmed) return ''
+  return trimmed.length > 120 ? trimmed.slice(0, 120) : trimmed
+}
+
+const removeSuggestedTag = (list, tagValue) => {
+  if (!list || !Array.isArray(list.aiSuggestedTags)) return []
+  return list.aiSuggestedTags.filter(tag => tag !== tagValue)
+}
 
 // MV3 popups cold-start before background writes settle. A post-listener re-read
 // keeps initialized=false until we confirm storage reflects the latest lists.
@@ -93,7 +194,7 @@ const confirmLocalListsHydrated = async baselineSignature => {
   if (latestSignature !== baselineSignature) {
     state.lists = latestLists
     state.lastSyncedSignature = latestSignature
-    state.remoteVersion = computeVersion(latestLists)
+    reconcileLocalTruth()
   }
 }
 
@@ -140,15 +241,14 @@ const pushStateToServer = async payload => {
   try {
     const response = await CustomSync.syncState(payload.lists)
     const remoteVersion = parseRemoteVersion(response?.updated_at) || computeVersion(payload.lists)
-    state.lastSyncedSignature = payload.signature
-    state.remoteVersion = remoteVersion
-    state.lastSyncedAt = Date.now()
-    state.lastSyncSuccess = true
     state.syncPhase = SYNC_PHASES.SYNCED
     state.syncError = null
     state.localOnly = false
     state.pendingRetry = null
     pendingPayload = null
+    state.lastSyncedSignature = payload.signature
+    finalizeSignatureAlignment({ remoteVersionOverride: remoteVersion })
+    browser.storage.local.set({ lastSyncedSignature: payload.signature }) // Persist signature
     logSyncEvent('push_success', {
       listCount: payload.lists?.length || 0,
       signature: payload.signature,
@@ -166,7 +266,19 @@ const pushStateToServer = async payload => {
     state.syncError = normalized
     state.localOnly = true
     state.pendingRetry = payload
-    scheduleRetry()
+    if (shouldAutoRetry(normalized)) {
+      scheduleRetry()
+    } else {
+      if (retryTimer) {
+        clearTimeout(retryTimer)
+        retryTimer = null
+      }
+      logSyncEvent('retry_blocked', {
+        code: normalized.code,
+        reason: payload?.reason,
+      })
+    }
+    state.snackbar = { status: true, msg: normalized.message, type: 'error' } // Notify error
     logSyncEvent('push_failed', {
       code: normalized.code,
       phase: normalized.phase,
@@ -187,6 +299,7 @@ const debouncedPush = _.debounce(() => {
 
 const scheduleSync = (reason = 'change', { immediate = false, listsOverride = null, signatureOverride = null, force = false } = {}) => {
   if (!state.initialized) return
+  if (!force && isAutoSyncBlocked()) return
   if (!force && !isAutoSyncEnabled(state.opts)) return
   const lists = listsOverride || $state.snapshot(state.lists)
   const signature = signatureOverride || buildSignature(lists)
@@ -232,15 +345,14 @@ const hydrateFromRemote = async () => {
     if (remoteVersion > localVersion) {
       const signature = buildSignature(normalizedRemote)
       state.lastSyncedSignature = signature
-      state.remoteVersion = remoteVersion
       state.lastSyncSuccess = true
-      state.localOnly = false
-      state.syncError = null
       await storage.setLists(normalizedRemote)
       console.log('[hydrate] setting lists:', normalizedRemote.length)
       state.lists = normalizedRemote
-      state.lastSyncedAt = Date.now()
+      finalizeSignatureAlignment({ remoteVersionOverride: remoteVersion })
+      state.localOnly = false
       state.syncPhase = SYNC_PHASES.SYNCED
+      browser.storage.local.set({ lastSyncedSignature: signature }) // Persist signature
       logSyncEvent('hydrate_success', {
         action: 'downloaded',
         remoteLists: normalizedRemote.length,
@@ -276,15 +388,17 @@ const hydrateFromRemote = async () => {
     state.syncError = normalized
     state.lastSyncSuccess = false
     state.localOnly = true
-    
+
     // FORCE LOCAL DATA TO PERSIST
     // This prevents the UI from clearing or hiding the lists 
     // just because the server at localhost:8000 is down.
     if (state.lists.length === 0) {
-       const data = await browser.storage.local.get('lists');
-       state.lists = Array.isArray(data.lists) ? data.lists : [];
+      const data = await browser.storage.local.get('lists')
+      state.lists = Array.isArray(data.lists) ? data.lists : []
+      reconcileLocalTruth()
     }
 
+    state.snackbar = { status: true, msg: normalized.message, type: 'error' } // Notify error
     logSyncEvent('hydrate_failed', {
       code: normalized.code,
       phase: normalized.phase,
@@ -294,7 +408,7 @@ const hydrateFromRemote = async () => {
   } finally {
     state.syncing = false
     // Ensure initialized is true so the UI knows it's okay to render
-    state.initialized = true 
+    state.initialized = true
   }
 }
 
@@ -302,16 +416,26 @@ const initStore = async (retries = 3) => {
   let shouldFinalize = true
   let baselineSignature = ''
   try {
-    const data = await browser.storage.local.get(['lists', 'opts'])
+    const data = await browser.storage.local.get(['lists', 'opts', 'lastSyncedSignature'])
     state.lists = Array.isArray(data.lists) ? data.lists : []
     state.opts = data.opts || {}
-    state.lastSyncedSignature = buildSignature(state.lists)
-    baselineSignature = state.lastSyncedSignature
+    state.lastSyncedSignature = data.lastSyncedSignature || '' // Load persisted signature
+    baselineSignature = buildSignature(state.lists)
     state.remoteVersion = computeVersion(state.lists)
     state.lastSyncSuccess = null
     state.localOnly = false
     state.syncError = null
-    state.syncPhase = isAutoSyncEnabled(state.opts) ? SYNC_PHASES.IDLE : SYNC_PHASES.NEVER_SYNCED
+
+    if (isAutoSyncEnabled(state.opts)) {
+      if (state.lastSyncedSignature === baselineSignature) {
+        state.syncPhase = SYNC_PHASES.SYNCED
+      } else {
+        state.syncPhase = SYNC_PHASES.LOCAL_ONLY
+        state.localOnly = true
+      }
+    } else {
+      state.syncPhase = SYNC_PHASES.NEVER_SYNCED
+    }
   } catch (error) {
     console.error('[SquirrlTab] Failed to initialize store:', error)
     if (retries > 0) {
@@ -334,6 +458,7 @@ const initStore = async (retries = 3) => {
       }
       await confirmLocalListsHydrated(baselineSignature)
       state.initialized = true
+      reconcileLocalTruth()
       setupAutoSyncTimer()
       if (isAutoSyncEnabled(state.opts)) {
         hydrateFromRemote()
@@ -350,11 +475,32 @@ browser.storage.onChanged.addListener((changes, area) => {
     const newLists = changes.lists.newValue
     state.lists = Array.isArray(newLists) ? newLists : []
     console.log('[SquirrlTab] Lists updated from storage:', state.lists.length)
+    reconcileLocalTruth()
   }
   if (changes.opts) {
+    const wasAuthBlocked = isAutoSyncBlocked()
     state.opts = changes.opts.newValue || {}
     console.log('[SquirrlTab] Options updated from storage')
     setupAutoSyncTimer()
+    if (wasAuthBlocked) {
+      state.syncError = null
+      state.syncPhase = SYNC_PHASES.IDLE
+      state.lastSyncSuccess = null
+      if (state.pendingRetry) {
+        scheduleSync('auth-retry', {
+          immediate: true,
+          listsOverride: state.pendingRetry.lists,
+          signatureOverride: state.pendingRetry.signature,
+          force: true,
+        })
+      } else if (isAutoSyncEnabled(state.opts)) {
+        hydrateFromRemote()
+      }
+    }
+  }
+  if (changes.lastSyncedSignature) {
+    state.lastSyncedSignature = changes.lastSyncedSignature.newValue || ''
+    finalizeSignatureAlignment()
   }
 })
 
@@ -366,7 +512,7 @@ $effect.root(() => {
     scheduleSync('change', { listsOverride: snapshot, signatureOverride: signature })
   })
 })
-  
+
 
 export const syncStore = {
   get lists() {
@@ -383,6 +529,12 @@ export const syncStore = {
   },
   get snackbar() {
     return state.snackbar
+  },
+  get duplicates() {
+    return state.duplicateIndex
+  },
+  getDuplicateMeta(listId) {
+    return state.duplicateIndex[listId] || EMPTY_DUPLICATE_META
   },
   get initialized() {
     return state.initialized
@@ -401,11 +553,11 @@ export const syncStore = {
       lastSyncSuccess: state.lastSyncSuccess,
     }
   },
-  updateSnackbar(payload) {
+  updateSnackbar(payload, type = 'info') {
     if (typeof payload === 'string') {
-      state.snackbar = { status: true, msg: payload }
+      state.snackbar = { status: true, msg: payload, type }
     } else {
-      state.snackbar = payload
+      state.snackbar = { ...payload, type: payload.type || 'info' }
     }
   },
   get pinnedLists() {
@@ -427,14 +579,38 @@ export const syncStore = {
 
     state.aiLoading = list._id
     try {
-      const result = await CustomSync.AI.categorize(list.tabs)
+      const privacy = filterTabsForPrivacy(list.tabs, state.opts?.aiExcludedDomains)
+      if (privacy.totalCount > 0 && privacy.allowedCount === 0) {
+        state.snackbar = {
+          status: true,
+          msg: 'AI disabled: all tabs excluded for privacy',
+          type: 'info',
+        }
+        return null
+      }
+      if (privacy.totalCount === 0) {
+        state.snackbar = {
+          status: true,
+          msg: 'AI unavailable: stash has no tabs',
+          type: 'info',
+        }
+        return null
+      }
+      const result = await CustomSync.AI.categorize(privacy.allowedTabs)
       if (result.category) {
         manager.updateListById(list._id, { category: result.category })
       }
       if (result.tags) {
         manager.updateListById(list._id, { tags: result.tags })
       }
-      return result
+      return {
+        ...result,
+        privacyMeta: {
+          allowedCount: privacy.allowedCount,
+          excludedCount: privacy.excludedCount,
+          totalCount: privacy.totalCount,
+        },
+      }
     } catch (error) {
       console.error('[SquirrlTab] Categorization failed:', error)
       throw error
@@ -457,14 +633,91 @@ export const syncStore = {
       return true
     } catch (error) {
       console.error('[SquirrlTab] Failed to restore list:', error)
-      throw error
+      state.snackbar = { status: true, msg: 'Failed to restore tabs', type: 'error' }
+      return false
     }
   },
   updateList(listId, updates) {
     manager.updateListById(listId, updates)
   },
-  removeList(listId) {
-    manager.removeListById(listId)
+  async acceptAiSuggestion(listId) {
+    const list = state.lists.find(l => l._id === listId)
+    if (!list?.aiSuggestedTitle) return false
+    try {
+      const hasRemainingTags = Array.isArray(list.aiSuggestedTags) && list.aiSuggestedTags.length > 0
+      await manager.updateListById(listId, {
+        title: list.aiSuggestedTitle,
+        aiSuggestedTitle: '',
+        aiSuggestionMeta: hasRemainingTags ? list.aiSuggestionMeta : null,
+      })
+      state.snackbar = { status: true, msg: 'AI suggestion applied', type: 'success' }
+      return true
+    } catch (error) {
+      console.error('[SquirrlTab] Failed to accept AI suggestion:', error)
+      state.snackbar = { status: true, msg: 'Unable to apply suggestion', type: 'error' }
+      return false
+    }
+  },
+  async rejectAiSuggestion(listId) {
+    const list = state.lists.find(l => l._id === listId)
+    if (!list?.aiSuggestedTitle) return false
+    try {
+      const hasRemainingTags = Array.isArray(list.aiSuggestedTags) && list.aiSuggestedTags.length > 0
+      await manager.updateListById(listId, {
+        aiSuggestedTitle: '',
+        aiSuggestionMeta: hasRemainingTags ? list.aiSuggestionMeta : null,
+      })
+      return true
+    } catch (error) {
+      console.error('[SquirrlTab] Failed to reject AI suggestion:', error)
+      state.snackbar = { status: true, msg: 'Unable to dismiss suggestion', type: 'error' }
+      return false
+    }
+  },
+  async acceptSuggestedTag(listId, tagValue) {
+    const normalizedTag = normalizeTagValue(tagValue)
+    if (!normalizedTag) return false
+    const list = state.lists.find(l => l._id === listId)
+    if (!list) return false
+    try {
+      const existing = Array.isArray(list.tags) ? list.tags : []
+      const merged = Array.from(new Set([...existing, normalizedTag]))
+      const remainingSuggestions = removeSuggestedTag(list, normalizedTag)
+      const shouldKeepMeta = remainingSuggestions.length > 0 || (list.aiSuggestedTitle && list.aiSuggestedTitle.length > 0)
+      await manager.updateListById(listId, {
+        tags: merged,
+        aiSuggestedTags: remainingSuggestions,
+        aiSuggestionMeta: shouldKeepMeta ? list.aiSuggestionMeta : null,
+      })
+      state.snackbar = { status: true, msg: `Tag "${normalizedTag}" added`, type: 'success' }
+      return true
+    } catch (error) {
+      console.error('[SquirrlTab] Failed to accept tag suggestion:', error)
+      state.snackbar = { status: true, msg: 'Unable to add suggested tag', type: 'error' }
+      return false
+    }
+  },
+  async rejectSuggestedTag(listId, tagValue) {
+    const normalizedTag = normalizeTagValue(tagValue)
+    if (!normalizedTag) return false
+    const list = state.lists.find(l => l._id === listId)
+    if (!list?.aiSuggestedTags?.length) return false
+    try {
+      const remaining = removeSuggestedTag(list, normalizedTag)
+      const shouldKeepMeta = remaining.length > 0 || (list.aiSuggestedTitle && list.aiSuggestedTitle.length > 0)
+      await manager.updateListById(listId, {
+        aiSuggestedTags: remaining,
+        aiSuggestionMeta: shouldKeepMeta ? list.aiSuggestionMeta : null,
+      })
+      return true
+    } catch (error) {
+      console.error('[SquirrlTab] Failed to reject tag suggestion:', error)
+      state.snackbar = { status: true, msg: 'Unable to dismiss tag suggestion', type: 'error' }
+      return false
+    }
+  },
+  async removeList(listId) {
+    return removeListSafely(listId)
   },
   pinList(listId, pinned) {
     manager.updateListById(listId, { pinned })
@@ -496,7 +749,8 @@ export const syncStore = {
   async cleanAll() {
     const ids = state.lists.map(l => l._id)
     for (const id of ids) {
-      manager.removeListById(id)
+      const removed = await removeListSafely(id)
+      if (!removed) break
     }
   },
 }
@@ -504,13 +758,13 @@ export const syncStore = {
 browser.runtime.onMessage.addListener(message => {
   if (!message || !message.type) return
   if (message.type === RUNTIME_MESSAGES.STASH_COMPLETED) {
-    syncStore.updateSnackbar('Current tab stashed')
+    syncStore.updateSnackbar('Current tab stashed', 'success')
   }
   if (message.type === RUNTIME_MESSAGES.STASH_FAILED) {
     const reason = message.payload?.reason
     const msg = reason === 'BLOCKED_URL'
       ? 'Cannot stash the SquirrlTab app itself'
       : 'Unable to stash current tab'
-    syncStore.updateSnackbar(msg)
+    syncStore.updateSnackbar(msg, 'error')
   }
 })

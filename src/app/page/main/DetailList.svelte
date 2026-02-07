@@ -11,6 +11,7 @@
 
   let isReady = $derived(syncStore.initialized);
   let lists = $derived(syncStore.lists);
+  let duplicateIndex = $derived(syncStore.duplicates);
 
   $effect(() => {
     if (!isReady) return;
@@ -194,13 +195,18 @@
     }
   }
 
-  function handleDelete(list) {
+  const duplicateMeta = (listId) =>
+    duplicateIndex[listId] || { hasDuplicates: false, count: 0 };
+
+  async function handleDelete(list) {
     if (!list) return;
     menuOpenFor = null;
     const confirmed = confirm("Delete this stash permanently?");
     if (!confirmed) return;
-    syncStore.removeList(list._id);
-    syncStore.updateSnackbar("Stash deleted");
+    const removed = await syncStore.removeList(list._id);
+    if (removed) {
+      syncStore.updateSnackbar("Stash deleted");
+    }
   }
 
   async function runAiCategorization(list) {
@@ -210,8 +216,20 @@
     );
     if (!confirmed) return;
     try {
-      await syncStore.categorizeList(list._id);
-      syncStore.updateSnackbar("AI suggestions applied");
+      const outcome = await syncStore.categorizeList(list._id);
+      if (!outcome) return;
+      const meta = outcome.privacyMeta;
+      if (meta && meta.totalCount > 0) {
+        const excludedNote =
+          meta.excludedCount > 0
+            ? ` (${meta.excludedCount} excluded for privacy)`
+            : "";
+        syncStore.updateSnackbar(
+          `AI suggestions applied (based on ${meta.allowedCount} of ${meta.totalCount} tabs${excludedNote})`,
+        );
+      } else {
+        syncStore.updateSnackbar("AI suggestions applied");
+      }
     } catch (error) {
       syncStore.updateSnackbar("AI categorization failed");
     } finally {
@@ -229,6 +247,30 @@
     if (!list) return;
     const tags = (list.tags || []).filter((t) => t !== tag);
     syncStore.updateList(list._id, { tags });
+  }
+
+  async function acceptAiName(list, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.acceptAiSuggestion(list._id);
+  }
+
+  async function rejectAiName(list, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.rejectAiSuggestion(list._id);
+  }
+
+  async function acceptSuggestedTag(list, tag, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.acceptSuggestedTag(list._id, tag);
+  }
+
+  async function rejectSuggestedTag(list, tag, event) {
+    if (event) event.stopPropagation();
+    if (!list) return;
+    await syncStore.rejectSuggestedTag(list._id, tag);
   }
 
   // Popup UI dispatches stash intent only; background performs all tab and storage work.
@@ -419,7 +461,84 @@
                     {new Date(list.time).toLocaleDateString()}
                   </span>
                 {/if}
+                {#if duplicateMeta(list._id).hasDuplicates}
+                  <span
+                    class="duplicate-indicator"
+                    title="This stash shares URLs with other stashes"
+                  >
+                    <span class="duplicate-dot" aria-hidden="true"></span>
+                    Duplicates {duplicateMeta(list._id).count}
+                  </span>
+                {/if}
               </div>
+              {#if list.aiSuggestedTitle}
+                <div
+                  class="ai-name-suggestion"
+                  onclick={(event) => event.stopPropagation()}
+                >
+                  <div class="ai-suggestion-body">
+                    <span class="ai-chip">Suggested</span>
+                    <span class="ai-value">{list.aiSuggestedTitle}</span>
+                  </div>
+                  <div class="ai-suggestion-actions">
+                    <button
+                      class="ai-btn"
+                      type="button"
+                      onclick={(event) => acceptAiName(list, event)}
+                    >
+                      Accept
+                    </button>
+                    <button
+                      class="ai-btn ghost"
+                      type="button"
+                      onclick={(event) => rejectAiName(list, event)}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              {/if}
+              {#if list.aiSuggestedTags && list.aiSuggestedTags.length}
+                <div
+                  class="ai-tag-suggestions"
+                  onclick={(event) => event.stopPropagation()}
+                >
+                  <div class="ai-suggestion-body">
+                    <span class="ai-chip">Suggested tags</span>
+                  </div>
+                  <div class="ai-tag-list">
+                    {#each list.aiSuggestedTags as tag}
+                      <div class="ai-tag-chip">
+                        <span class="tag-label">#{tag}</span>
+                        <div class="ai-tag-actions">
+                          <button
+                            class="ai-tag-btn"
+                            type="button"
+                            onclick={(event) => acceptSuggestedTag(list, tag, event)}
+                            aria-label={`Accept tag ${tag}`}
+                          >
+                            Add
+                          </button>
+                          <button
+                            class="ai-tag-btn ghost"
+                            type="button"
+                            onclick={(event) => rejectSuggestedTag(list, tag, event)}
+                            aria-label={`Dismiss tag ${tag}`}
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+              {#if list.aiSuggestionMeta && (list.aiSuggestedTitle || (list.aiSuggestedTags && list.aiSuggestedTags.length))}
+                <p class="ai-privacy-note">
+                  Based on {list.aiSuggestionMeta.allowedCount} of {list.aiSuggestionMeta.totalCount} tabs
+                  ({list.aiSuggestionMeta.excludedCount} excluded for privacy)
+                </p>
+              {/if}
             </div>
 
             <div class="card-actions">

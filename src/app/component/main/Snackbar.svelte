@@ -2,15 +2,34 @@
   import { syncStore } from "../../store/syncStore.svelte.js";
   import { fade, fly } from "svelte/transition";
 
-  let snackbar = $derived(syncStore.snackbar || { status: false, msg: "" });
+  let snackbar = $derived(
+    syncStore.snackbar || { status: false, msg: "", type: "info" },
+  );
 
   const close = () => {
-    syncStore.updateSnackbar({ status: false, msg: "" });
+    syncStore.updateSnackbar({ status: false, msg: "", type: "info" });
   };
+
+  const typeConfig = {
+    success: {
+      icon: "fa-check-circle",
+      class: "success",
+    },
+    error: {
+      icon: "fa-exclamation-circle",
+      class: "error",
+    },
+    info: {
+      icon: "fa-info-circle",
+      class: "info",
+    },
+  };
+
+  let config = $derived(typeConfig[snackbar.type] || typeConfig.info);
 
   $effect(() => {
     if (snackbar.status) {
-      const timer = setTimeout(close, 3000);
+      const timer = setTimeout(close, 4000);
       return () => clearTimeout(timer);
     }
   });
@@ -18,8 +37,8 @@
 
 {#if snackbar.status}
   <div class="snackbar" transition:fly={{ y: 20, duration: 300 }} role="alert">
-    <div class="snackbar-content">
-      <i class="fas fa-check-circle snackbar-icon"></i>
+    <div class="snackbar-content {config.class}">
+      <i class={`fas ${config.icon} snackbar-icon`}></i>
       <span class="snackbar-message">{snackbar.msg}</span>
       <button
         class="snackbar-close"
@@ -55,10 +74,31 @@
       0 8px 32px rgba(0, 0, 0, 0.4),
       0 0 0 1px rgba(255, 255, 255, 0.05);
     border: 1px solid #2c2e33;
+    transition: border-color 0.2s;
+  }
+
+  .snackbar-content.success {
+    border-left: 4px solid #40c057;
+  }
+  .snackbar-content.success .snackbar-icon {
+    color: #40c057;
+  }
+
+  .snackbar-content.error {
+    border-left: 4px solid #fa5252;
+  }
+  .snackbar-content.error .snackbar-icon {
+    color: #fa5252;
+  }
+
+  .snackbar-content.info {
+    border-left: 4px solid #4dabf7;
+  }
+  .snackbar-content.info .snackbar-icon {
+    color: #4dabf7;
   }
 
   .snackbar-icon {
-    color: #40c057;
     font-size: 1.125rem;
   }
 

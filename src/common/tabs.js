@@ -3,6 +3,8 @@ import { createNewTabList } from './list'
 import listManager from './listManager'
 import { ILLEGAL_URLS } from './constants'
 import { Mutex } from './utils'
+import CustomSync from './service/custom-sync'
+import { filterTabsForPrivacy } from './aiPrivacy'
 
 
 const getAllInWindow = windowId => chrome.tabs.query({ windowId })
@@ -62,8 +64,77 @@ const groupTabsInCurrentWindow = async () => {
   return result
 }
 
+const AI_NAME_TIMEOUT_MS = 8000
+const aiSuggestionInflight = new Set()
+const isAiNamingEnabled = opts => opts?.aiNameSuggestions === true
 const isLegalURL = url => ILLEGAL_URLS.every(prefix => !url.startsWith(prefix))
 const stashMutex = new Mutex() // serialize stash flows so concurrent triggers cannot interleave
+
+const normalizeSuggestedTitle = payload => {
+  if (!payload || typeof payload !== 'object') return ''
+  const candidate = payload.title || payload.name || payload.suggestion || payload.label
+  if (typeof candidate !== 'string') return ''
+  return candidate.trim()
+}
+
+const normalizeSuggestedTags = payload => {
+  const raw = Array.isArray(payload?.tags)
+    ? payload.tags
+    : Array.isArray(payload?.tagSuggestions)
+      ? payload.tagSuggestions
+      : []
+  const cleaned = raw
+    .map(tag => (typeof tag === 'string' ? tag.trim() : ''))
+    .filter(Boolean)
+  if (cleaned.length === 0) return []
+  return Array.from(new Set(cleaned))
+}
+
+const withTimeout = (promise, timeoutMs) => new Promise((resolve, reject) => {
+  const timer = setTimeout(() => reject(new Error('AI_SUGGEST_TIMEOUT')), timeoutMs)
+  promise.then(resolve, reject).finally(() => clearTimeout(timer))
+})
+
+const triggerAiNameSuggestion = (list, opts) => {
+  if (!isAiNamingEnabled(opts)) return
+  if (!CustomSync?.AI?.suggestName) return
+  if (!Array.isArray(list.tabs) || list.tabs.length === 0) return
+  if (aiSuggestionInflight.has(list._id)) return
+  aiSuggestionInflight.add(list._id)
+  ;(async () => {
+    try {
+      const privacy = filterTabsForPrivacy(list.tabs, opts?.aiExcludedDomains)
+      if (privacy.totalCount === 0) {
+        return
+      }
+      if (privacy.totalCount > 0 && privacy.allowedCount === 0) {
+        return
+      }
+      const response = await withTimeout(CustomSync.AI.suggestName(privacy.allowedTabs), AI_NAME_TIMEOUT_MS)
+      const suggestion = normalizeSuggestedTitle(response)
+      if (!suggestion) {
+        return
+      }
+      const tags = normalizeSuggestedTags(response)
+      const updates = {
+        aiSuggestedTitle: suggestion,
+        aiSuggestionMeta: {
+          allowedCount: privacy.allowedCount,
+          excludedCount: privacy.excludedCount,
+          totalCount: privacy.totalCount,
+        },
+        aiSuggestedTags: tags,
+      }
+      await listManager.updateListById(list._id, updates)
+    } catch (error) {
+      if (error?.message !== 'AI_SUGGEST_TIMEOUT') {
+        console.warn('[SquirrlTab] Failed to fetch AI name suggestion', error)
+      }
+    } finally {
+      aiSuggestionInflight.delete(list._id)
+    }
+  })()
+}
 const storeTabs = async (tabs, listIndex) => {
   const appUrl = chrome.runtime.getURL('')
   tabs = tabs.filter(i => !i.url.startsWith(appUrl))
@@ -78,10 +149,12 @@ const storeTabs = async (tabs, listIndex) => {
     // Always hydrate from storage inside the lock so that stash operations cannot interleave.
     const lists = await storage.getLists()
 
+    let newlyCreatedList = null
     if (listIndex == null) {
       const newList = createNewTabList({ tabs })
       if (opts.pinNewList) newList.pinned = true
       lists.unshift(newList)
+      newlyCreatedList = newList
     } else {
       const list = lists[listIndex]
       tabs.forEach(tab => list.tabs.push(tab))
@@ -89,6 +162,10 @@ const storeTabs = async (tabs, listIndex) => {
 
     // Persist first; tab removal only proceeds after a successful write.
     await storage.setLists(lists)
+
+    if (newlyCreatedList) {
+      triggerAiNameSuggestion(newlyCreatedList, opts)
+    }
 
     return chrome.tabs.remove(tabs.map(i => i.id))
   } finally {

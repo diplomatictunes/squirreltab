@@ -473,59 +473,62 @@
               </div>
               {#if list.aiSuggestedTitle}
                 <div
-                  class="ai-name-suggestion"
+                  class="slash-ai-row"
                   onclick={(event) => event.stopPropagation()}
                 >
-                  <div class="ai-suggestion-body">
-                    <span class="ai-chip">Suggested</span>
+                  <div class="ai-icon" title="AI Suggestion">✨</div>
+                  <div class="ai-content">
+                    <span class="ai-label">Suggested:</span>
                     <span class="ai-value">{list.aiSuggestedTitle}</span>
                   </div>
-                  <div class="ai-suggestion-actions">
+                  <div class="ai-actions">
                     <button
-                      class="ai-btn"
+                      class="ai-action-btn accept"
                       type="button"
+                      title="Accept suggestion"
                       onclick={(event) => acceptAiName(list, event)}
                     >
-                      Accept
+                      <i class="fas fa-check"></i>
                     </button>
                     <button
-                      class="ai-btn ghost"
+                      class="ai-action-btn reject"
                       type="button"
+                      title="Dismiss"
                       onclick={(event) => rejectAiName(list, event)}
                     >
-                      Dismiss
+                      <i class="fas fa-times"></i>
                     </button>
                   </div>
                 </div>
               {/if}
               {#if list.aiSuggestedTags && list.aiSuggestedTags.length}
                 <div
-                  class="ai-tag-suggestions"
+                  class="slash-ai-row"
                   onclick={(event) => event.stopPropagation()}
                 >
-                  <div class="ai-suggestion-body">
-                    <span class="ai-chip">Suggested tags</span>
-                  </div>
-                  <div class="ai-tag-list">
+                  <div class="ai-icon" title="AI Suggested Tags">✨</div>
+                  <div class="ai-content">
                     {#each list.aiSuggestedTags as tag}
-                      <div class="ai-tag-chip">
-                        <span class="tag-label">#{tag}</span>
-                        <div class="ai-tag-actions">
+                      <div class="ai-tag-pill">
+                        <span class="tag-text">#{tag}</span>
+                        <div class="ai-tag-btns">
                           <button
-                            class="ai-tag-btn"
+                            class="ai-tag-action accept"
                             type="button"
-                            onclick={(event) => acceptSuggestedTag(list, tag, event)}
-                            aria-label={`Accept tag ${tag}`}
+                            title="Add tag"
+                            onclick={(event) =>
+                              acceptSuggestedTag(list, tag, event)}
                           >
-                            Add
+                            <i class="fas fa-plus"></i>
                           </button>
                           <button
-                            class="ai-tag-btn ghost"
+                            class="ai-tag-action reject"
                             type="button"
-                            onclick={(event) => rejectSuggestedTag(list, tag, event)}
-                            aria-label={`Dismiss tag ${tag}`}
+                            title="Dismiss"
+                            onclick={(event) =>
+                              rejectSuggestedTag(list, tag, event)}
                           >
-                            Dismiss
+                            <i class="fas fa-times"></i>
                           </button>
                         </div>
                       </div>
@@ -535,8 +538,9 @@
               {/if}
               {#if list.aiSuggestionMeta && (list.aiSuggestedTitle || (list.aiSuggestedTags && list.aiSuggestedTags.length))}
                 <p class="ai-privacy-note">
-                  Based on {list.aiSuggestionMeta.allowedCount} of {list.aiSuggestionMeta.totalCount} tabs
-                  ({list.aiSuggestionMeta.excludedCount} excluded for privacy)
+                  Based on {list.aiSuggestionMeta.allowedCount} of {list
+                    .aiSuggestionMeta.totalCount} tabs ({list.aiSuggestionMeta
+                    .excludedCount} excluded for privacy)
                 </p>
               {/if}
             </div>
@@ -700,6 +704,137 @@
 {/if}
 
 <style>
+  /* AI Suggestions Refined */
+  .slash-ai-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed #2c2e33;
+    font-size: 13px;
+    color: #909296;
+  }
+
+  .ai-icon {
+    font-size: 14px;
+    line-height: 1.4;
+    user-select: none;
+  }
+
+  .ai-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .ai-label {
+    color: #5c5f66;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 500;
+  }
+
+  .ai-value {
+    color: #e4e4e7;
+    font-weight: 500;
+  }
+
+  .ai-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .ai-action-btn {
+    background: transparent;
+    border: none;
+    color: #5c5f66;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    line-height: 1;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ai-action-btn:hover {
+    background: #25262b;
+    color: #e4e4e7;
+  }
+
+  .ai-action-btn.accept:hover {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+  }
+
+  .ai-action-btn.reject:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  /* AI Tag Pills */
+  .ai-tag-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px 2px 10px;
+    border: 1px solid #2c2e33;
+    border-radius: 100px;
+    font-size: 11px;
+    background: transparent;
+    color: #909296;
+    transition: border-color 0.2s;
+  }
+
+  .ai-tag-pill:hover {
+    border-color: #5c5f66;
+  }
+
+  .tag-text {
+    font-weight: 500;
+  }
+
+  .ai-tag-btns {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    border-left: 1px solid #2c2e33;
+    padding-left: 4px;
+    margin-left: 2px;
+  }
+
+  .ai-tag-action {
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: #5c5f66;
+    font-size: 10px;
+    padding: 4px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+  }
+
+  .ai-tag-action:hover {
+    color: #e4e4e7;
+    background: #25262b;
+  }
+
+  .ai-tag-action.accept:hover {
+    color: #10b981;
+  }
+
+  .ai-tag-action.reject:hover {
+    color: #ef4444;
+  }
   /* Loading State */
   .loading-container {
     display: flex;
@@ -940,15 +1075,16 @@
   /* Stash Card */
   .stash-card {
     background: #1a1b1e;
-    border: 1px solid #2c2e33;
-    border-radius: 16px;
-    overflow: visible;
-    transition: all 0.3s;
+    border: 1px solid #27272a;
+    border-radius: 10px;
+    overflow: hidden;
+    transition: all 0.2s;
   }
 
   .stash-card:hover {
-    border-color: #3c3e44;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    background: #1e1f23;
+    border-color: #3f3f46;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     transform: translateY(-2px);
   }
 
@@ -1000,34 +1136,33 @@
   }
 
   .stash-title {
-    width: 100%;
     background: transparent;
     border: none;
     color: #e4e4e7;
-    font-size: 1.125rem;
+    font-size: 14px;
     font-weight: 600;
-    padding: 4px 8px;
-    margin: -4px -8px 4px;
-    border-radius: 6px;
+    width: 100%;
+    padding: 0;
+    margin: 0;
     outline: none;
-    transition: all 0.2s;
+    cursor: text;
   }
 
-  .stash-title:hover {
-    background: rgba(255, 255, 255, 0.02);
-  }
-
-  .stash-title:focus {
-    background: #25262b;
-    box-shadow: 0 0 0 2px rgba(255, 146, 43, 0.2);
+  .tab-count,
+  .stash-date {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #909296;
   }
 
   .meta-info {
     display: flex;
     align-items: center;
-    gap: 16px;
-    font-size: 0.8125rem;
-    color: #5c5f66;
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
   }
 
   .meta-info span {

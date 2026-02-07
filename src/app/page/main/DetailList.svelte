@@ -472,6 +472,8 @@
                 {/if}
               </div>
               {#if list.aiSuggestedTitle}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
                   class="slash-ai-row"
                   onclick={(event) => event.stopPropagation()}
@@ -502,6 +504,8 @@
                 </div>
               {/if}
               {#if list.aiSuggestedTags && list.aiSuggestedTags.length}
+                <!-- svelte-ignore a11y_click_events_have_key_events -->
+                <!-- svelte-ignore a11y_no_static_element_interactions -->
                 <div
                   class="slash-ai-row"
                   onclick={(event) => event.stopPropagation()}
